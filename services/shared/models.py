@@ -106,17 +106,20 @@ class BrandRegistryEntry(BaseModel):
     last_active: datetime
 
 
-class PerformanceRecord(BaseModel):
-    """Engagement metrics for a published post."""
-
-    post_id: str
-    brand_id: str
-    user_id: str
+class ApprovalQueueItem(BaseModel):
+    slot_id: str
     platform: Platform
-    impressions: int = 0
-    engagements: int = 0
-    clicks: int = 0
-    recorded_at: datetime
+    scheduled_time: datetime
+    content_text: str
+    video_url: str | None = None
+    critic_score: float
+    status: str = "pending"
+
+
+class ApprovalDecision(BaseModel):
+    session_id: str
+    slot_id: str
+    action: str  # "approve", "skip", "regenerate"
 
 
 class AgentEnvelope(BaseModel):
@@ -145,7 +148,6 @@ class BrandPerformanceSummary(BaseModel):
     top_formats: list[dict]
     best_times: dict
     avoid_patterns: list[str]
-
 
 
 class TrendContext(BaseModel):
