@@ -18,7 +18,7 @@ export function CalendarView() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 font-mono text-sm">
         Loading content slots...
       </div>
     );
@@ -26,7 +26,7 @@ export function CalendarView() {
 
   if (slots.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 font-mono text-sm">
         No content slots yet. Onboard a brand to generate your first slate.
       </div>
     );

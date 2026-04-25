@@ -20,7 +20,7 @@ export function BrandBasicsStep({ form, onChange, onNext }: Props) {
     <Card>
       <CardHeader>
         <h2 className="text-lg font-semibold">Brand Basics</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-slate-500">
           Tell us about your brand so our AI agents can create on-brand content.
         </p>
       </CardHeader>

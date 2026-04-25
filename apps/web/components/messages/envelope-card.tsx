@@ -7,9 +7,9 @@ interface Props {
 }
 
 const agentBorderColors: Record<string, string> = {
-  strategist: "border-l-blue-400",
-  critic: "border-l-amber-400",
-  publisher: "border-l-green-400",
+  strategist: "border-l-cyan-400",
+  critic: "border-l-orange-400",
+  publisher: "border-l-lime-400",
 };
 
 function formatPayload(envelope: AgentEnvelope): string {
@@ -56,25 +56,25 @@ export function EnvelopeCard({ envelope }: Props) {
   return (
     <div
       className={cn(
-        "border-l-4 rounded-r-lg bg-white p-4 shadow-sm",
-        agentBorderColors[envelope.from_agent] ?? "border-l-neutral-300"
+        "border-l-[3px] rounded-r-md bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+        agentBorderColors[envelope.from_agent] ?? "border-l-slate-300"
       )}
     >
       <div className="flex items-start gap-3">
         <AgentAvatar agent={envelope.from_agent} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-semibold capitalize">
+            <span className="text-xs font-semibold uppercase font-mono tracking-wide">
               {envelope.from_agent}
             </span>
-            <span className="text-xs text-neutral-400">{time}</span>
+            <span className="text-[10px] text-slate-400 font-mono">{time}</span>
           </div>
-          <p className="text-sm text-neutral-700">
+          <p className="text-sm text-slate-600">
             {formatPayload(envelope)}
           </p>
-          <p className="text-xs text-neutral-400 mt-1 font-mono">
-            Envelope: {envelope.signature}
-          </p>
+          <span className="inline-block text-[10px] text-slate-400 font-mono mt-1.5 bg-slate-50 px-2 py-0.5 rounded">
+            {envelope.signature}
+          </span>
         </div>
       </div>
     </div>

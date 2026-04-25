@@ -61,7 +61,7 @@ export function PublishView() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 font-mono text-sm">
         Loading slots and ASI:One rankings...
       </div>
     );

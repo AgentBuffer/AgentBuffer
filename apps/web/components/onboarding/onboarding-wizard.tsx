@@ -78,21 +78,21 @@ export function OnboardingWizard() {
               <div
                 className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   i <= step
-                    ? "bg-neutral-900 text-white"
-                    : "bg-neutral-200 text-neutral-500"
+                    ? "bg-cyan-600 text-white"
+                    : "bg-slate-200 text-slate-500"
                 }`}
               >
                 {i + 1}
               </div>
               <span
                 className={`text-sm ${
-                  i <= step ? "text-neutral-900 font-medium" : "text-neutral-400"
+                  i <= step ? "text-slate-900 font-medium" : "text-slate-400"
                 }`}
               >
                 {label}
               </span>
               {i < STEPS.length - 1 && (
-                <div className="w-8 h-px bg-neutral-300" />
+                <div className="w-8 h-px bg-slate-300" />
               )}
             </div>
           ))}

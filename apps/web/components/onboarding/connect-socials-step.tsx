@@ -25,7 +25,7 @@ export function ConnectSocialsStep({
     <Card>
       <CardHeader>
         <h2 className="text-lg font-semibold">Connect Socials & Extract</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-slate-500">
           Link your social accounts and let AI extract your brand kit.
         </p>
       </CardHeader>

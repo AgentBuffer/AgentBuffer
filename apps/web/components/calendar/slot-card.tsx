@@ -26,19 +26,19 @@ export function SlotCard({ slot, onClick, selected }: Props) {
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md",
-        selected && "ring-2 ring-neutral-900"
+        selected && "ring-2 ring-cyan-600"
       )}
       onClick={onClick}
     >
       <div className="p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-neutral-500">{day}</span>
-          <span className="text-xs text-neutral-400">
+          <span className="text-[10px] font-medium text-slate-500 font-mono uppercase">{day}</span>
+          <span className="text-[10px] text-slate-400 font-mono">
             {platformLabels[slot.platform] ?? slot.platform}
           </span>
         </div>
 
-        <div className="aspect-square rounded-lg bg-neutral-100 flex items-center justify-center overflow-hidden">
+        <div className="aspect-square rounded-md bg-slate-50 flex items-center justify-center overflow-hidden relative">
           {slot.image_url ? (
             <img
               src={slot.image_url}
@@ -46,13 +46,13 @@ export function SlotCard({ slot, onClick, selected }: Props) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <span className="text-2xl text-neutral-300">
+            <span className="text-2xl text-slate-300">
               {slot.slot_number}
             </span>
           )}
         </div>
 
-        <p className="text-xs text-neutral-600 line-clamp-2">{slot.caption}</p>
+        <p className="text-xs text-slate-600 line-clamp-2">{slot.caption}</p>
 
         <div className="flex items-center justify-between">
           <StatusBadge status={slot.status} />
@@ -61,8 +61,8 @@ export function SlotCard({ slot, onClick, selected }: Props) {
               className={cn(
                 "text-xs font-semibold",
                 slot.critic_average >= 3.5
-                  ? "text-green-600"
-                  : "text-red-600"
+                  ? "text-lime-600"
+                  : "text-red-500"
               )}
             >
               {slot.critic_average.toFixed(1)}

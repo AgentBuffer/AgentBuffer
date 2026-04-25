@@ -18,7 +18,7 @@ export function SideBySide({ before, after, seed }: Props) {
           Slot {before.slot_number} &mdash; Regenerated
         </h3>
         {seed && (
-          <p className="text-xs text-neutral-400 font-mono">
+          <p className="text-[10px] text-slate-400 font-mono">
             Same seed: {seed}
           </p>
         )}
@@ -26,10 +26,10 @@ export function SideBySide({ before, after, seed }: Props) {
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <span className="text-xs font-medium text-neutral-500 uppercase">
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest font-mono">
               Before
             </span>
-            <div className="aspect-square rounded-lg bg-neutral-100 flex items-center justify-center">
+            <div className="aspect-square rounded-md bg-slate-50 flex items-center justify-center">
               {before.image_url ? (
                 <img
                   src={before.image_url}
@@ -37,7 +37,7 @@ export function SideBySide({ before, after, seed }: Props) {
                   className="w-full h-full object-cover rounded-lg"
                 />
               ) : (
-                <span className="text-neutral-300">v1</span>
+                <span className="text-slate-300 font-mono">v1</span>
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -51,10 +51,10 @@ export function SideBySide({ before, after, seed }: Props) {
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-medium text-neutral-500 uppercase">
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest font-mono">
               After
             </span>
-            <div className="aspect-square rounded-lg bg-neutral-100 flex items-center justify-center">
+            <div className="aspect-square rounded-md bg-slate-50 flex items-center justify-center">
               {after.image_url ? (
                 <img
                   src={after.image_url}
@@ -62,7 +62,7 @@ export function SideBySide({ before, after, seed }: Props) {
                   className="w-full h-full object-cover rounded-lg"
                 />
               ) : (
-                <span className="text-neutral-300">v2</span>
+                <span className="text-slate-300 font-mono">v2</span>
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -70,8 +70,8 @@ export function SideBySide({ before, after, seed }: Props) {
                 className={cn(
                   "text-xs font-semibold",
                   (after.critic_average ?? 0) >= 3.5
-                    ? "text-green-600"
-                    : "text-red-600"
+                    ? "text-lime-600"
+                    : "text-red-500"
                 )}
               >
                 {after.critic_average?.toFixed(1)}/5
@@ -80,8 +80,8 @@ export function SideBySide({ before, after, seed }: Props) {
                 className={cn(
                   "text-xs font-semibold uppercase",
                   after.status === "approved"
-                    ? "text-green-600"
-                    : "text-red-600"
+                    ? "text-lime-600"
+                    : "text-red-500"
                 )}
               >
                 {after.status}

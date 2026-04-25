@@ -6,18 +6,18 @@ const agentConfig: Record<
 > = {
   strategist: {
     label: "S",
-    bgClass: "bg-blue-100",
-    textClass: "text-blue-700",
+    bgClass: "bg-cyan-500",
+    textClass: "text-white",
   },
   critic: {
     label: "C",
-    bgClass: "bg-amber-100",
-    textClass: "text-amber-700",
+    bgClass: "bg-orange-400",
+    textClass: "text-white",
   },
   publisher: {
     label: "P",
-    bgClass: "bg-green-100",
-    textClass: "text-green-700",
+    bgClass: "bg-lime-400",
+    textClass: "text-slate-900",
   },
 };
 
@@ -35,7 +35,7 @@ export function AgentAvatar({ agent }: Props) {
   return (
     <div
       className={cn(
-        "h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+        "h-7 w-7 rounded flex items-center justify-center text-xs font-bold shrink-0",
         config.bgClass,
         config.textClass
       )}

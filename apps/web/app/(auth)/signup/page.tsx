@@ -42,11 +42,11 @@ export default function SignupPage() {
     <main className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-xl bg-neutral-900 flex items-center justify-center mx-auto">
+          <div className="h-12 w-12 rounded-xl border-2 border-cyan-600 bg-[#0F172A] flex items-center justify-center mx-auto">
             <span className="text-white font-bold">AB</span>
           </div>
           <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-slate-500">
             Set up your brand&apos;s AI agent team
           </p>
         </div>
@@ -98,9 +98,9 @@ export default function SignupPage() {
             {loading ? "Creating account..." : "Create Account"}
           </Button>
         </form>
-        <p className="text-center text-sm text-neutral-500">
+        <p className="text-center text-sm text-slate-500">
           Already have an account?{" "}
-          <Link href="/login" className="text-neutral-900 font-medium hover:underline">
+          <Link href="/login" className="text-cyan-600 font-medium hover:underline">
             Sign in
           </Link>
         </p>

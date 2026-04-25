@@ -42,7 +42,7 @@ export function UploadAssetsStep({ form, onChange, onBack, onNext }: Props) {
     <Card>
       <CardHeader>
         <h2 className="text-lg font-semibold">Upload Assets</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-slate-500">
           Upload brand guidelines, marketing PDFs, or past content for AI extraction.
         </p>
       </CardHeader>
@@ -50,7 +50,7 @@ export function UploadAssetsStep({ form, onChange, onBack, onNext }: Props) {
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          className="border-2 border-dashed border-neutral-300 rounded-lg p-8 text-center hover:border-neutral-400 transition-colors cursor-pointer"
+          className="border-2 border-dashed border-slate-300 rounded-md p-8 text-center hover:border-cyan-400 transition-colors cursor-pointer"
         >
           <input
             type="file"
@@ -61,11 +61,11 @@ export function UploadAssetsStep({ form, onChange, onBack, onNext }: Props) {
             id="pdf-upload"
           />
           <label htmlFor="pdf-upload" className="cursor-pointer">
-            <Upload className="h-8 w-8 text-neutral-400 mx-auto mb-2" />
-            <p className="text-sm text-neutral-600 font-medium">
+            <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-sm text-slate-600 font-medium">
               Drop PDFs here or click to upload
             </p>
-            <p className="text-xs text-neutral-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Brand guidelines, marketing decks, content calendars
             </p>
           </label>
@@ -76,14 +76,14 @@ export function UploadAssetsStep({ form, onChange, onBack, onNext }: Props) {
             {form.pdfs.map((file, i) => (
               <div
                 key={`${file.name}-${i}`}
-                className="flex items-center justify-between bg-neutral-50 rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-slate-50 rounded-md px-3 py-2"
               >
-                <span className="text-sm text-neutral-700 truncate">
+                <span className="text-sm text-slate-700 truncate">
                   {file.name}
                 </span>
                 <button
                   onClick={() => removePdf(i)}
-                  className="text-neutral-400 hover:text-red-500"
+                  className="text-slate-400 hover:text-red-500"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -113,7 +113,7 @@ export function UploadAssetsStep({ form, onChange, onBack, onNext }: Props) {
               {form.video_urls.map((url, i) => (
                 <span
                   key={`${url}-${i}`}
-                  className="inline-flex items-center gap-1 bg-neutral-100 text-xs rounded-full px-2.5 py-1"
+                  className="inline-flex items-center gap-1 bg-slate-100 text-xs rounded-full px-2.5 py-1"
                 >
                   {url.substring(0, 40)}...
                   <button

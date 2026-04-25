@@ -20,7 +20,7 @@ export function SlotChecklist({ slots, selected, onToggle }: Props) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-neutral-700">
+      <h3 className="text-xs font-semibold text-slate-700 font-mono uppercase tracking-wider">
         All approved slots:
       </h3>
       {approvedSlots.map((slot) => {
@@ -33,8 +33,8 @@ export function SlotChecklist({ slots, selected, onToggle }: Props) {
             className={cn(
               "flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors",
               checked
-                ? "border-neutral-900 bg-neutral-50"
-                : "border-neutral-200 hover:border-neutral-300"
+                ? "border-cyan-600 bg-cyan-50/50"
+                : "border-slate-200 hover:border-cyan-300"
             )}
           >
             <input
@@ -52,7 +52,7 @@ export function SlotChecklist({ slots, selected, onToggle }: Props) {
               </span>
             </span>
             {isIG && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] bg-violet-50 text-violet-600 px-2 py-0.5 rounded font-mono">
                 queued for review
               </span>
             )}
