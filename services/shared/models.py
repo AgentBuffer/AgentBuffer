@@ -168,6 +168,25 @@ class VideoResult(BaseModel):
     error: str | None = None
 
 
+class ImageRequest(BaseModel):
+    slot_id: str
+    prompt: str
+    aspect_ratio: str
+    platform: Platform
+    style: str | None = None
+    brand_context: str
+    negative_prompt: str = ""
+
+
+class ImageResult(BaseModel):
+    slot_id: str
+    image_url: str | None = None
+    local_path: str | None = None
+    platform: Platform
+    status: str  # "success", "error"
+    error: str | None = None
+
+
 class MarketingAnalysis(BaseModel):
     """LLM-generated marketing analysis of a business."""
 

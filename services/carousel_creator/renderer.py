@@ -59,11 +59,27 @@ def _load_logo(logo_url: str | None) -> Image.Image | None:
         return None
 
 
+def _load_background_image(image_url: str | None) -> Image.Image | None:
+    """Load and resize a background image from a local path. Returns None on failure."""
+    if not image_url:
+        return None
+    try:
+        bg_path = Path(image_url)
+        if not bg_path.exists():
+            return None
+        bg = Image.open(bg_path).convert("RGB")
+        bg = bg.resize((SLIDE_WIDTH, SLIDE_HEIGHT), Image.LANCZOS)
+        return bg
+    except Exception:
+        return None
+
+
 def render_slide(
     slide: SlideContent,
     brand: BrandKit,
     output_path: Path,
     total_slides: int = 1,
+    background_image_url: str | None = None,
 ) -> Path:
     """Render a single carousel slide as a 1080x1350 PNG.
 
@@ -72,6 +88,7 @@ def render_slide(
         brand: Brand kit for colors, logo, and styling.
         output_path: File path where the PNG will be saved.
         total_slides: Total number of slides (for badge display).
+        background_image_url: Optional AI-generated image path/URL to use as background.
 
     Returns:
         The output_path after saving.
@@ -82,6 +99,15 @@ def render_slide(
     text_color = (255, 255, 255)
 
     img = Image.new("RGB", (SLIDE_WIDTH, SLIDE_HEIGHT), bg_color)
+
+    # Use AI-generated background image if available
+    bg_loaded = _load_background_image(background_image_url)
+    if bg_loaded:
+        img.paste(bg_loaded, (0, 0))
+        # Apply dark overlay so text remains readable
+        overlay = Image.new("RGBA", (SLIDE_WIDTH, SLIDE_HEIGHT), (0, 0, 0, 140))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+
     draw = ImageDraw.Draw(img)
 
     # Accent bar at the top
