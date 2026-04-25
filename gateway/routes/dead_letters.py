@@ -25,7 +25,7 @@ async def list_dead_letters(
         {
             "id": "dl-001",
             "slot_id": "slot-003",
-            "error_message": "Ayrshare API error: 429 — Rate limit exceeded",
+            "error_message": "Platform API error: 429 — Rate limit exceeded",
             "error_code": "RATE_LIMIT",
             "retry_count": 2,
             "resolved": False,

@@ -213,14 +213,9 @@ export function SlotDetail({ slot, onClose, onAction }: Props) {
             </>
           )}
           {slot.status === "published" && (
-            <a
-              href="https://app.ayrshare.com/analytics"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-lg font-medium transition-colors border border-slate-200 bg-white hover:bg-slate-50 h-8 px-3 text-sm"
-            >
-              View Analytics
-            </a>
+            <span className="inline-flex items-center justify-center rounded-lg font-medium border border-green-200 bg-green-50 text-green-700 h-8 px-3 text-sm">
+              Published
+            </span>
           )}
         </div>
 
