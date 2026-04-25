@@ -1,39 +1,37 @@
 """FastAPI routes for the YouTube Automation dashboard and API."""
 
-import json
 import datetime
+import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from youtube_automation.config import settings
 from youtube_automation.database import (
-    Video,
-    VideoStatus,
     ContentPillar,
     Short,
     ShortStatus,
-    ContentCalendar,
-    AnalyticsSnapshot,
+    Video,
+    VideoStatus,
     get_db,
-    init_db,
 )
-from youtube_automation.modules.script_generator import ScriptGenerator
-from youtube_automation.modules.seo import SEOOptimizer
-from youtube_automation.modules.thumbnail import ThumbnailGenerator
-from youtube_automation.modules.voiceover import VoiceoverGenerator
-from youtube_automation.modules.shorts import ShortsExtractor
 from youtube_automation.modules.analytics import AnalyticsTracker
 from youtube_automation.modules.calendar import ContentScheduler
 from youtube_automation.modules.file_organizer import FileOrganizer
-from youtube_automation.modules.webhooks import WebhookHandler, WebhookEvent
-from youtube_automation.config import settings
+from youtube_automation.modules.script_generator import ScriptGenerator
+from youtube_automation.modules.seo import SEOOptimizer
+from youtube_automation.modules.shorts import ShortsExtractor
+from youtube_automation.modules.thumbnail import ThumbnailGenerator
+from youtube_automation.modules.voiceover import VoiceoverGenerator
+from youtube_automation.modules.webhooks import WebhookEvent, WebhookHandler
 
 router = APIRouter()
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────
+
 
 class VideoCreate(BaseModel):
     title: str
@@ -107,6 +105,7 @@ class ExtractShortsRequest(BaseModel):
 
 # ── Dashboard (HTML) ─────────────────────────────────────────────────────
 
+
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard page."""
@@ -136,6 +135,7 @@ async def calendar_page(request: Request):
 
 
 # ── API: Videos ──────────────────────────────────────────────────────────
+
 
 @router.get("/api/videos")
 async def list_videos(
@@ -298,6 +298,7 @@ async def delete_video(video_id: int):
 
 # ── API: Script Generation ───────────────────────────────────────────────
 
+
 @router.post("/api/generate/script")
 async def generate_script(data: GenerateScriptRequest):
     """Generate a full video script using AI."""
@@ -321,7 +322,9 @@ async def generate_script(data: GenerateScriptRequest):
                 voiceover_direction=result.voiceover_direction,
                 description=result.description,
                 tags=",".join(result.seo_tags),
-                pillar=ContentPillar(data.pillar) if data.pillar in [e.value for e in ContentPillar] else None,
+                pillar=ContentPillar(data.pillar)
+                if data.pillar in [e.value for e in ContentPillar]
+                else None,
                 status=VideoStatus.SCRIPTED,
             )
             db.add(video)
@@ -367,6 +370,7 @@ async def generate_titles(topic: str, count: int = 10):
 
 
 # ── API: Voiceover ───────────────────────────────────────────────────────
+
 
 @router.post("/api/generate/voiceover")
 async def generate_voiceover(data: GenerateVoiceoverRequest):
@@ -433,6 +437,7 @@ async def voiceover_usage():
 
 # ── API: Thumbnails ──────────────────────────────────────────────────────
 
+
 @router.post("/api/generate/thumbnail")
 async def generate_thumbnail(data: GenerateThumbnailRequest):
     """Generate a thumbnail for a video."""
@@ -474,6 +479,7 @@ async def generate_thumbnail(data: GenerateThumbnailRequest):
 
 
 # ── API: SEO ─────────────────────────────────────────────────────────────
+
 
 @router.post("/api/seo/optimize")
 async def optimize_seo(data: SEOOptimizeRequest):
@@ -523,6 +529,7 @@ async def analyze_titles(titles: list[str]):
 
 
 # ── API: Shorts ──────────────────────────────────────────────────────────
+
 
 @router.post("/api/shorts/extract")
 async def extract_shorts(data: ExtractShortsRequest):
@@ -595,6 +602,7 @@ async def shorts_schedule():
 
 # ── API: Calendar ────────────────────────────────────────────────────────
 
+
 @router.post("/api/calendar/generate")
 async def generate_calendar(data: GenerateCalendarRequest):
     """Generate a content calendar."""
@@ -639,6 +647,7 @@ async def complete_calendar_entry(entry_id: int):
 
 
 # ── API: Analytics ───────────────────────────────────────────────────────
+
 
 @router.get("/api/analytics/report")
 async def analytics_report(days: int = 30):
@@ -689,6 +698,7 @@ async def underperformers(ctr_threshold: float = 3.0, retention_threshold: float
 
 # ── API: Webhooks ────────────────────────────────────────────────────────
 
+
 @router.post("/api/webhooks/incoming")
 async def incoming_webhook(data: WebhookPayload):
     """Handle incoming webhooks from Make.com/Zapier."""
@@ -704,6 +714,7 @@ async def incoming_webhook(data: WebhookPayload):
 
 
 # ── API: File Organization ───────────────────────────────────────────────
+
 
 @router.post("/api/files/setup")
 async def setup_files(base_dir: str | None = None):
@@ -740,6 +751,7 @@ async def create_project(video_id: int):
 
 
 # ── API: Pipeline (Orchestrated Workflow) ────────────────────────────────
+
 
 @router.post("/api/pipeline/full")
 async def run_full_pipeline(title: str, pillar: str = "dark_psychology"):
@@ -803,11 +815,13 @@ async def run_full_pipeline(title: str, pillar: str = "dark_psychology"):
                 db.commit()
             finally:
                 db.close()
-            results["steps"].append({
-                "step": "voiceover",
-                "status": "success",
-                "duration": vo_result.duration_seconds,
-            })
+            results["steps"].append(
+                {
+                    "step": "voiceover",
+                    "status": "success",
+                    "duration": vo_result.duration_seconds,
+                }
+            )
         except Exception as e:
             results["steps"].append({"step": "voiceover", "status": "error", "error": str(e)})
     else:
@@ -828,7 +842,9 @@ async def run_full_pipeline(title: str, pillar: str = "dark_psychology"):
             db.commit()
         finally:
             db.close()
-        results["steps"].append({"step": "thumbnail", "status": "success", "path": thumb_result.path})
+        results["steps"].append(
+            {"step": "thumbnail", "status": "success", "path": thumb_result.path}
+        )
     except Exception as e:
         results["steps"].append({"step": "thumbnail", "status": "error", "error": str(e)})
 
@@ -860,7 +876,9 @@ async def run_full_pipeline(title: str, pillar: str = "dark_psychology"):
         f"---\n\n"
         f"{script.raw_narration}\n"
     )
-    results["steps"].append({"step": "save_script_file", "status": "success", "path": str(script_path)})
+    results["steps"].append(
+        {"step": "save_script_file", "status": "success", "path": str(script_path)}
+    )
 
     results["status"] = "complete"
     results["project_dir"] = str(Path(project_dirs["script"]).parent)

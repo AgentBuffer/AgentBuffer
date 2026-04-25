@@ -1,6 +1,5 @@
 """ElevenLabs voiceover generation module."""
 
-import io
 from dataclasses import dataclass
 from pathlib import Path
 

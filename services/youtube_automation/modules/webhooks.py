@@ -1,13 +1,12 @@
 """Webhook endpoints for Make.com/Zapier automation integration."""
 
+import datetime
 import hashlib
 import hmac
-import json
-import datetime
 from dataclasses import dataclass
 
 from youtube_automation.config import settings
-from youtube_automation.database import Video, VideoStatus, Short, ShortStatus, Automation, get_db
+from youtube_automation.database import Short, ShortStatus, Video, VideoStatus, get_db
 
 
 @dataclass

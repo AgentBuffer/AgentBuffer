@@ -1,11 +1,8 @@
 """Shorts extraction and repurposing system."""
 
-import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-
-from youtube_automation.config import settings
 
 
 @dataclass
@@ -47,24 +44,31 @@ class ShortsExtractor:
 
         if vertical:
             # Convert 16:9 to 9:16 with center crop
-            filter_str = (
-                "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,"
-                "scale=1080:1920:flags=lanczos"
-            )
+            filter_str = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920:flags=lanczos"
         else:
             filter_str = "scale=1920:1080:flags=lanczos"
 
         cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(start_time),
-            "-i", str(video_path),
-            "-t", str(duration),
-            "-vf", filter_str,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-b:a", "128k",
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(start_time),
+            "-i",
+            str(video_path),
+            "-t",
+            str(duration),
+            "-vf",
+            filter_str,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
             str(output_path),
         ]
 
@@ -110,13 +114,20 @@ class ShortsExtractor:
         style_str = styles.get(style, styles["bold_center"])
 
         cmd = [
-            "ffmpeg", "-y",
-            "-i", str(video_path),
-            "-vf", f"subtitles={srt_path}:force_style='{style_str}'",
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
-            "-c:a", "copy",
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video_path),
+            "-vf",
+            f"subtitles={srt_path}:force_style='{style_str}'",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-c:a",
+            "copy",
             str(output_path),
         ]
 
@@ -159,15 +170,17 @@ class ShortsExtractor:
                 end_time=clip["end_time"],
             )
 
-            results.append(ShortClip(
-                title=clip["title"],
-                clip_type=clip["clip_type"],
-                start_time=clip["start_time"],
-                end_time=clip["end_time"],
-                output_path=str(output_path),
-                hook=clip.get("hook", ""),
-                duration=clip["end_time"] - clip["start_time"],
-            ))
+            results.append(
+                ShortClip(
+                    title=clip["title"],
+                    clip_type=clip["clip_type"],
+                    start_time=clip["start_time"],
+                    end_time=clip["end_time"],
+                    output_path=str(output_path),
+                    hook=clip.get("hook", ""),
+                    duration=clip["end_time"] - clip["start_time"],
+                )
+            )
 
         return results
 
@@ -176,13 +189,15 @@ class ShortsExtractor:
         clips = []
 
         # Hook clip (first 30-60 seconds)
-        clips.append({
-            "title": "Hook clip",
-            "clip_type": "hook",
-            "start_time": 0,
-            "end_time": min(60, video_duration * 0.1),
-            "hook": "",
-        })
+        clips.append(
+            {
+                "title": "Hook clip",
+                "clip_type": "hook",
+                "start_time": 0,
+                "end_time": min(60, video_duration * 0.1),
+                "hook": "",
+            }
+        )
 
         # Find points in script and select the best one
         points = script.get("points", [])
@@ -192,23 +207,27 @@ class ShortsExtractor:
             point = points[best_idx]
             # Estimate timestamp based on position
             point_start = (best_idx / len(points)) * video_duration * 0.7 + video_duration * 0.1
-            clips.append({
-                "title": f"Best point: {point.get('title', '')}",
-                "clip_type": "best_point",
-                "start_time": point_start,
-                "end_time": min(point_start + 75, video_duration),
-                "hook": point.get("narration", "")[:100],
-            })
+            clips.append(
+                {
+                    "title": f"Best point: {point.get('title', '')}",
+                    "clip_type": "best_point",
+                    "start_time": point_start,
+                    "end_time": min(point_start + 75, video_duration),
+                    "hook": point.get("narration", "")[:100],
+                }
+            )
 
         # Twist clip (near the end)
         twist_start = video_duration * 0.75
-        clips.append({
-            "title": "Twist/Revelation",
-            "clip_type": "twist",
-            "start_time": twist_start,
-            "end_time": min(twist_start + 45, video_duration),
-            "hook": "",
-        })
+        clips.append(
+            {
+                "title": "Twist/Revelation",
+                "clip_type": "twist",
+                "start_time": twist_start,
+                "end_time": min(twist_start + 45, video_duration),
+                "hook": "",
+            }
+        )
 
         return clips
 

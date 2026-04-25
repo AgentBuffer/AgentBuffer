@@ -11,9 +11,11 @@ from googleapiclient.http import MediaFileUpload
 
 from youtube_automation.config import settings
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
-          "https://www.googleapis.com/auth/youtube",
-          "https://www.googleapis.com/auth/youtube.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 
 
 @dataclass
@@ -42,6 +44,7 @@ class YouTubeUploader:
         if not self._credentials or not self._credentials.valid:
             if self._credentials and self._credentials.expired and self._credentials.refresh_token:
                 from google.auth.transport.requests import Request
+
                 self._credentials.refresh(Request())
             else:
                 if not client_secrets_file:
@@ -171,13 +174,17 @@ class YouTubeUploader:
         if not self.service:
             self.authenticate()
 
-        response = self.service.playlists().insert(
-            part="snippet,status",
-            body={
-                "snippet": {"title": title, "description": description},
-                "status": {"privacyStatus": privacy},
-            },
-        ).execute()
+        response = (
+            self.service.playlists()
+            .insert(
+                part="snippet,status",
+                body={
+                    "snippet": {"title": title, "description": description},
+                    "status": {"privacyStatus": privacy},
+                },
+            )
+            .execute()
+        )
 
         return response["id"]
 
@@ -186,10 +193,14 @@ class YouTubeUploader:
         if not self.service:
             self.authenticate()
 
-        response = self.service.videos().list(
-            part="statistics,snippet",
-            id=video_id,
-        ).execute()
+        response = (
+            self.service.videos()
+            .list(
+                part="statistics,snippet",
+                id=video_id,
+            )
+            .execute()
+        )
 
         if not response.get("items"):
             return {}
@@ -210,10 +221,14 @@ class YouTubeUploader:
         if not self.service:
             self.authenticate()
 
-        response = self.service.channels().list(
-            part="statistics,snippet",
-            mine=True,
-        ).execute()
+        response = (
+            self.service.channels()
+            .list(
+                part="statistics,snippet",
+                mine=True,
+            )
+            .execute()
+        )
 
         if not response.get("items"):
             return {}
@@ -240,10 +255,14 @@ class YouTubeUploader:
             self.authenticate()
 
         # Get current video data
-        current = self.service.videos().list(
-            part="snippet",
-            id=video_id,
-        ).execute()
+        current = (
+            self.service.videos()
+            .list(
+                part="snippet",
+                id=video_id,
+            )
+            .execute()
+        )
 
         if not current.get("items"):
             raise ValueError(f"Video not found: {video_id}")

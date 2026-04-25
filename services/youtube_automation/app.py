@@ -8,7 +8,6 @@ from fastapi.templating import Jinja2Templates
 
 from youtube_automation.api.routes import router
 from youtube_automation.database import init_db
-from youtube_automation.config import settings
 
 
 def create_app() -> FastAPI:

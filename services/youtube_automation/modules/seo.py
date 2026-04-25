@@ -34,8 +34,9 @@ Related Videos:
 
 #psychology #darkpsychology #manipulation #bodylanguage #selfimprovement #humanpsychology
 
-DISCLAIMER: This video is for educational purposes only. If you are experiencing 
-manipulation or emotional abuse, please seek professional help."""
+DISCLAIMER: This video is for educational purposes only.
+If you are experiencing manipulation or emotional abuse,
+please seek professional help."""
 
 
 class SEOOptimizer:
@@ -189,10 +190,10 @@ DISCLAIMER: This video is for educational purposes only."""
                 {
                     "role": "user",
                     "content": (
-                        f"Score these titles:\n"
-                        + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
-                        + f'\n\nOutput: {{"scores": [{{"title": "...", "score": 8, '
-                        f'"reason": "...", "improvement": "suggested improvement"}}]}}'
+                        "Score these titles:\n"
+                        + "\n".join(f"{i + 1}. {t}" for i, t in enumerate(titles))
+                        + '\n\nOutput: {"scores": [{"title": "...", "score": 8, '
+                        '"reason": "...", "improvement": "suggested improvement"}]}'
                     ),
                 },
             ],

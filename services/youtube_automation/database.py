@@ -4,16 +4,16 @@ import datetime
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
+    Enum,
     Float,
     ForeignKey,
     Integer,
     String,
     Text,
     create_engine,
-    Enum,
-    Boolean,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
@@ -96,7 +96,9 @@ class Video(Base):
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
 
     # Relationships
     shorts = relationship("Short", back_populates="video", cascade="all, delete-orphan")

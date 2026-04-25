@@ -89,7 +89,11 @@ class ContentScheduler:
                         vid_id = None
                         title = f"[{slot['type']}] Scheduled content"
 
-                        if slot["type"] == "long_form" and available_videos and video_idx < len(available_videos):
+                        if (
+                            slot["type"] == "long_form"
+                            and available_videos
+                            and video_idx < len(available_videos)
+                        ):
                             vid_id = available_videos[video_idx]
                             video = db.query(Video).filter(Video.id == vid_id).first()
                             if video:

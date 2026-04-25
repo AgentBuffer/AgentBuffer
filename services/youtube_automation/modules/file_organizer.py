@@ -139,8 +139,7 @@ class FileOrganizer:
         revenue = self.base_dir / "09_Business" / "Revenue_Tracker.csv"
         if not revenue.exists():
             revenue.write_text(
-                "Month,Ad Revenue,Affiliate Revenue,Product Revenue,"
-                "Sponsor Revenue,Total,Notes\n"
+                "Month,Ad Revenue,Affiliate Revenue,Product Revenue,Sponsor Revenue,Total,Notes\n"
             )
 
     def get_stats(self) -> dict:

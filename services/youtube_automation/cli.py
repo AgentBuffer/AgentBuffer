@@ -5,12 +5,12 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress
+from rich.table import Table
 
 from youtube_automation.config import settings
-from youtube_automation.database import init_db, get_db, Video, VideoStatus, ContentPillar
+from youtube_automation.database import ContentPillar, Video, VideoStatus, get_db, init_db
 
 console = Console()
 
@@ -23,13 +23,16 @@ def cli():
 
 # ── Setup ────────────────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.option("--dir", "base_dir", default=None, help="Base directory for content files")
 def setup(base_dir):
     """Initialize the project: create folders, database, and templates."""
     from youtube_automation.modules.file_organizer import FileOrganizer
 
-    console.print(Panel("[bold red]YouTube Automation System[/bold red]\nInitializing...", border_style="red"))
+    console.print(
+        Panel("[bold red]YouTube Automation System[/bold red]\nInitializing...", border_style="red")
+    )
 
     # Database
     init_db()
@@ -49,6 +52,7 @@ def setup(base_dir):
 
 # ── Script Generation ────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.argument("title")
 @click.option("--pillar", default="dark_psychology", help="Content pillar")
@@ -63,12 +67,18 @@ def script(title, pillar, minutes, points, save):
         gen = ScriptGenerator()
         result = gen.generate(title=title, pillar=pillar, target_minutes=minutes, num_points=points)
 
-    console.print(Panel(f"[bold]{result.title}[/bold]", title="Generated Script", border_style="red"))
-    console.print(f"\n[bold]Hook:[/bold] \"{result.hook}\"")
+    console.print(
+        Panel(f"[bold]{result.title}[/bold]", title="Generated Script", border_style="red")
+    )
+    console.print(f'\n[bold]Hook:[/bold] "{result.hook}"')
     console.print(f"\n[bold]Voiceover Direction:[/bold] {result.voiceover_direction}")
     console.print(f"\n[bold]Tags:[/bold] {', '.join(result.seo_tags[:10])}")
-    console.print(f"\n[bold]Script Preview:[/bold]")
-    console.print(result.raw_narration[:1000] + "..." if len(result.raw_narration) > 1000 else result.raw_narration)
+    console.print("\n[bold]Script Preview:[/bold]")
+    console.print(
+        result.raw_narration[:1000] + "..."
+        if len(result.raw_narration) > 1000
+        else result.raw_narration
+    )
 
     if save:
         db = get_db()
@@ -80,7 +90,9 @@ def script(title, pillar, minutes, points, save):
                 visual_notes=json.dumps(result.full_script),
                 voiceover_direction=result.voiceover_direction,
                 tags=",".join(result.seo_tags),
-                pillar=ContentPillar(pillar) if pillar in [e.value for e in ContentPillar] else None,
+                pillar=ContentPillar(pillar)
+                if pillar in [e.value for e in ContentPillar]
+                else None,
                 status=VideoStatus.SCRIPTED,
             )
             db.add(video)
@@ -142,14 +154,15 @@ def generate_ideas(count, pillar, save):
 
 # ── Voiceover ────────────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.argument("video_id", type=int)
 @click.option("--preset", default="authoritative_male", help="Voice preset")
 @click.option("--output", default=None, help="Output file path")
 def voiceover(video_id, preset, output):
     """Generate voiceover for a video."""
-    from youtube_automation.modules.voiceover import VoiceoverGenerator
     from youtube_automation.modules.file_organizer import FileOrganizer
+    from youtube_automation.modules.voiceover import VoiceoverGenerator
 
     db = get_db()
     try:
@@ -174,7 +187,7 @@ def voiceover(video_id, preset, output):
         video.status = VideoStatus.VOICEOVER_DONE
         db.commit()
 
-        console.print(f"[green]Voiceover generated![/green]")
+        console.print("[green]Voiceover generated![/green]")
         console.print(f"  File: {result.audio_path}")
         console.print(f"  Duration: ~{result.duration_seconds:.0f}s")
         console.print(f"  Characters: {result.char_count}")
@@ -185,15 +198,20 @@ def voiceover(video_id, preset, output):
 
 # ── Thumbnail ────────────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.argument("video_id", type=int)
-@click.option("--template", default="bold_text", type=click.Choice(["bold_text", "numbered", "warning", "split", "question"]))
+@click.option(
+    "--template",
+    default="bold_text",
+    type=click.Choice(["bold_text", "numbered", "warning", "split", "question"]),
+)
 @click.option("--scheme", default="dark_dramatic", help="Color scheme")
 @click.option("--output", default=None, help="Output file path")
 def thumbnail(video_id, template, scheme, output):
     """Generate a thumbnail for a video."""
-    from youtube_automation.modules.thumbnail import ThumbnailGenerator
     from youtube_automation.modules.file_organizer import FileOrganizer
+    from youtube_automation.modules.thumbnail import ThumbnailGenerator
 
     db = get_db()
     try:
@@ -218,7 +236,7 @@ def thumbnail(video_id, template, scheme, output):
         video.thumbnail_path = result.path
         db.commit()
 
-        console.print(f"[green]Thumbnail generated![/green]")
+        console.print("[green]Thumbnail generated![/green]")
         console.print(f"  File: {result.path}")
         console.print(f"  Template: {result.template_name}")
         console.print(f"  Size: {result.dimensions[0]}x{result.dimensions[1]}")
@@ -227,6 +245,7 @@ def thumbnail(video_id, template, scheme, output):
 
 
 # ── SEO ──────────────────────────────────────────────────────────────────
+
 
 @cli.command()
 @click.argument("video_id", type=int)
@@ -250,10 +269,12 @@ def seo(video_id):
         video.tags = ",".join(result.tags)
         db.commit()
 
-        console.print(Panel(f"[bold]{result.title}[/bold]", title="SEO Optimized", border_style="green"))
+        console.print(
+            Panel(f"[bold]{result.title}[/bold]", title="SEO Optimized", border_style="green")
+        )
         console.print(f"\n[bold]Tags:[/bold] {', '.join(result.tags[:15])}")
         console.print(f"\n[bold]Hashtags:[/bold] {' '.join(result.hashtags[:10])}")
-        console.print(f"\n[bold]Description Preview:[/bold]")
+        console.print("\n[bold]Description Preview:[/bold]")
         console.print(result.description[:500])
     finally:
         db.close()
@@ -261,17 +282,17 @@ def seo(video_id):
 
 # ── Full Pipeline ────────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.argument("title")
 @click.option("--pillar", default="dark_psychology", help="Content pillar")
 @click.option("--skip-voiceover", is_flag=True, help="Skip voiceover generation")
 def pipeline(title, pillar, skip_voiceover):
     """Run the full production pipeline for a video."""
-    from youtube_automation.modules.script_generator import ScriptGenerator
-    from youtube_automation.modules.voiceover import VoiceoverGenerator
-    from youtube_automation.modules.thumbnail import ThumbnailGenerator
-    from youtube_automation.modules.seo import SEOOptimizer
     from youtube_automation.modules.file_organizer import FileOrganizer
+    from youtube_automation.modules.script_generator import ScriptGenerator
+    from youtube_automation.modules.thumbnail import ThumbnailGenerator
+    from youtube_automation.modules.voiceover import VoiceoverGenerator
 
     console.print(Panel(f"[bold red]Full Pipeline[/bold red]\n{title}", border_style="red"))
 
@@ -295,7 +316,9 @@ def pipeline(title, pillar, skip_voiceover):
                 visual_notes=json.dumps(script_result.full_script),
                 voiceover_direction=script_result.voiceover_direction,
                 tags=",".join(script_result.seo_tags),
-                pillar=ContentPillar(pillar) if pillar in [e.value for e in ContentPillar] else None,
+                pillar=ContentPillar(pillar)
+                if pillar in [e.value for e in ContentPillar]
+                else None,
                 status=VideoStatus.SCRIPTED,
             )
             db.add(video)
@@ -362,7 +385,7 @@ def pipeline(title, pillar, skip_voiceover):
             db.close()
         progress.advance(task)
 
-    console.print(f"\n[bold green]Pipeline complete![/bold green]")
+    console.print("\n[bold green]Pipeline complete![/bold green]")
     console.print(f"  Video ID: {video_id}")
     console.print(f"  Title: {script_result.title}")
     console.print(f"  Script: {script_path}")
@@ -371,6 +394,7 @@ def pipeline(title, pillar, skip_voiceover):
 
 
 # ── List Videos ──────────────────────────────────────────────────────────
+
 
 @cli.command("list")
 @click.option("--status", default=None, help="Filter by status")
@@ -394,8 +418,11 @@ def list_videos(status, limit):
 
         for v in videos:
             status_style = {
-                "idea": "blue", "scripted": "yellow", "voiceover_done": "magenta",
-                "published": "green", "scheduled": "cyan",
+                "idea": "blue",
+                "scripted": "yellow",
+                "voiceover_done": "magenta",
+                "published": "green",
+                "scheduled": "cyan",
             }.get(v.status.value if v.status else "", "white")
 
             table.add_row(
@@ -413,6 +440,7 @@ def list_videos(status, limit):
 
 
 # ── Calendar ─────────────────────────────────────────────────────────────
+
 
 @cli.command("calendar")
 @click.option("--weeks", default=4, help="Number of weeks")
@@ -446,6 +474,7 @@ def calendar(weeks):
 
 # ── Analytics ────────────────────────────────────────────────────────────
 
+
 @cli.command()
 @click.option("--days", default=30, help="Report period in days")
 def analytics(days):
@@ -455,15 +484,17 @@ def analytics(days):
     tracker = AnalyticsTracker()
     report = tracker.get_performance_report(days)
 
-    console.print(Panel(
-        f"[bold]Videos:[/bold] {report.total_videos}  |  "
-        f"[bold]Views:[/bold] {report.total_views:,}  |  "
-        f"[bold]Avg CTR:[/bold] {report.avg_ctr:.1f}%  |  "
-        f"[bold]Avg Retention:[/bold] {report.avg_retention:.1f}%  |  "
-        f"[bold]Revenue:[/bold] ${report.total_revenue:.2f}",
-        title=f"Analytics Report (Last {days} Days)",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Videos:[/bold] {report.total_videos}  |  "
+            f"[bold]Views:[/bold] {report.total_views:,}  |  "
+            f"[bold]Avg CTR:[/bold] {report.avg_ctr:.1f}%  |  "
+            f"[bold]Avg Retention:[/bold] {report.avg_retention:.1f}%  |  "
+            f"[bold]Revenue:[/bold] ${report.total_revenue:.2f}",
+            title=f"Analytics Report (Last {days} Days)",
+            border_style="green",
+        )
+    )
 
     if report.recommendations:
         console.print("\n[bold]Recommendations:[/bold]")
@@ -472,6 +503,7 @@ def analytics(days):
 
 
 # ── Web Dashboard ────────────────────────────────────────────────────────
+
 
 @cli.command()
 @click.option("--host", default=None, help="Host address")
@@ -483,11 +515,12 @@ def serve(host, port):
     h = host or settings.dashboard_host
     p = port or settings.dashboard_port
 
-    console.print(Panel(
-        f"[bold red]YouTube Automation Dashboard[/bold red]\n"
-        f"Running at http://{h}:{p}",
-        border_style="red",
-    ))
+    console.print(
+        Panel(
+            f"[bold red]YouTube Automation Dashboard[/bold red]\nRunning at http://{h}:{p}",
+            border_style="red",
+        )
+    )
 
     uvicorn.run(
         "youtube_automation.app:app",

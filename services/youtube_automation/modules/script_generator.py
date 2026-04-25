@@ -7,25 +7,27 @@ from openai import OpenAI
 
 from youtube_automation.config import settings
 
-SCRIPT_SYSTEM_PROMPT = """You are an expert YouTube scriptwriter specializing in dark psychology, 
-human behavior, and self-improvement content for faceless channels. You write scripts optimized for 
-maximum retention with these rules:
+SCRIPT_SYSTEM_PROMPT = """\
+You are an expert YouTube scriptwriter specializing in dark psychology,
+human behavior, and self-improvement content for faceless channels.
+You write scripts optimized for maximum retention with these rules:
 
-1. HOOK (0:00-0:03): Bold claim, shocking stat, or provocative question that creates instant curiosity
+1. HOOK (0:00-0:03): Bold claim, shocking stat, or provocative question
 2. CONTEXT (0:03-0:30): Why this matters to the viewer RIGHT NOW
 3. PREVIEW (0:30-1:00): "By the end of this video, you'll know exactly..."
-4. BODY (1:00-7:00): Numbered list with pattern interrupts every 60-90 seconds
+4. BODY (1:00-7:00): Numbered list with pattern interrupts every 60-90s
 5. TWIST/REVELATION (7:00-8:00): Unexpected insight or reframe
 6. CTA (8:00-8:30): Subscribe prompt tied to video value
-7. LOOP ENDING (8:30-9:00): Tease related content to drive next video click
+7. LOOP ENDING (8:30-9:00): Tease related content to drive next click
 
 Pattern Interrupt Phrases (use every 90 seconds):
 - "But here's where it gets really dark..."
 - "Now, pay very close attention to this next one..."
 - "Most people miss this completely..."
 
-Write in a conversational, authoritative tone. Include specific research citations 
-(psychologist names, study details). Each point should have a clear explanation + real-world example.
+Write in a conversational, authoritative tone. Include specific research
+citations (psychologist names, study details). Each point should have a
+clear explanation + real-world example.
 
 ALWAYS output valid JSON."""
 
@@ -225,7 +227,7 @@ class ScriptGenerator:
                 {
                     "role": "user",
                     "content": (
-                        f"Rewrite this hook for short-form: \"{original_hook}\"\n\n"
+                        f'Rewrite this hook for short-form: "{original_hook}"\n\n'
                         f'Output JSON: {{"hooks": ["hook1", "hook2", "hook3", "hook4", "hook5"]}}'
                     ),
                 },

@@ -2,9 +2,8 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from io import BytesIO
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 
 @dataclass
@@ -138,9 +137,15 @@ class ThumbnailGenerator:
             # Draw gradient
             for y in range(THUMBNAIL_HEIGHT):
                 ratio = y / THUMBNAIL_HEIGHT
-                r = int(colors["gradient_top"][0] * (1 - ratio) + colors["gradient_bottom"][0] * ratio)
-                g = int(colors["gradient_top"][1] * (1 - ratio) + colors["gradient_bottom"][1] * ratio)
-                b = int(colors["gradient_top"][2] * (1 - ratio) + colors["gradient_bottom"][2] * ratio)
+                r = int(
+                    colors["gradient_top"][0] * (1 - ratio) + colors["gradient_bottom"][0] * ratio
+                )
+                g = int(
+                    colors["gradient_top"][1] * (1 - ratio) + colors["gradient_bottom"][1] * ratio
+                )
+                b = int(
+                    colors["gradient_top"][2] * (1 - ratio) + colors["gradient_bottom"][2] * ratio
+                )
                 draw.line([(0, y), (THUMBNAIL_WIDTH, y)], fill=(r, g, b))
 
         # Add subtle vignette
@@ -340,9 +345,7 @@ class ThumbnailGenerator:
 
         # Right side subtitle
         if subtitle:
-            sub_lines = self._wrap_text(
-                subtitle.upper(), self.fonts["title_medium"], mid - 60
-            )
+            sub_lines = self._wrap_text(subtitle.upper(), self.fonts["title_medium"], mid - 60)
             y_start = (THUMBNAIL_HEIGHT - len(sub_lines) * 70) // 2
             for i, line in enumerate(sub_lines):
                 self._draw_text_with_outline(
@@ -368,7 +371,7 @@ class ThumbnailGenerator:
             (THUMBNAIL_WIDTH - 300, 50),
             "?",
             self.fonts["number"],
-            (*colors["accent"], ),
+            (*colors["accent"],),
             outline_width=8,
         )
 

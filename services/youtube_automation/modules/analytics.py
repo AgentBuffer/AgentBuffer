@@ -72,11 +72,7 @@ class AnalyticsTracker:
             cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
 
             # Get video stats
-            videos = (
-                db.query(Video)
-                .filter(Video.status == VideoStatus.PUBLISHED)
-                .all()
-            )
+            videos = db.query(Video).filter(Video.status == VideoStatus.PUBLISHED).all()
 
             total_views = sum(v.views for v in videos)
             avg_ctr = sum(v.ctr for v in videos) / len(videos) if videos else 0
@@ -88,17 +84,17 @@ class AnalyticsTracker:
                 {"id": v.id, "title": v.title, "views": v.views, "ctr": v.ctr}
                 for v in sorted_by_views[:5]
             ]
-            worst_videos = [
-                {"id": v.id, "title": v.title, "views": v.views, "ctr": v.ctr}
-                for v in sorted_by_views[-3:]
-            ] if len(sorted_by_views) >= 3 else []
+            worst_videos = (
+                [
+                    {"id": v.id, "title": v.title, "views": v.views, "ctr": v.ctr}
+                    for v in sorted_by_views[-3:]
+                ]
+                if len(sorted_by_views) >= 3
+                else []
+            )
 
             # Revenue from snapshots
-            snapshots = (
-                db.query(AnalyticsSnapshot)
-                .filter(AnalyticsSnapshot.date >= cutoff)
-                .all()
-            )
+            snapshots = db.query(AnalyticsSnapshot).filter(AnalyticsSnapshot.date >= cutoff).all()
             total_revenue = sum(
                 s.revenue_ads + s.revenue_affiliates + s.revenue_products + s.revenue_sponsors
                 for s in snapshots
@@ -195,7 +191,9 @@ class AnalyticsTracker:
         finally:
             db.close()
 
-    def flag_underperformers(self, ctr_threshold: float = 3.0, retention_threshold: float = 30.0) -> list[dict]:
+    def flag_underperformers(
+        self, ctr_threshold: float = 3.0, retention_threshold: float = 30.0
+    ) -> list[dict]:
         """Flag videos that are underperforming."""
         db = get_db()
         try:
