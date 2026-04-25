@@ -480,7 +480,12 @@ async def _dispatch_image_generation(ctx: Context, session_id: str, recipient: s
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[IMAGE_REQUEST:{session_id}]\n{image_payload}")],
+            content=[
+                TextContent(
+                    type="text",
+                    text=f"[IMAGE_REQUEST:{session_id}]\n{image_payload}",
+                )
+            ],
         ),
     )
 
@@ -551,7 +556,8 @@ async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
             await _send_status(
                 ctx,
                 user_sender,
-                f"Image generation complete: {success_count}/{len(results)} images created successfully.",
+                f"Image generation complete: {success_count}/{len(results)}"
+                " images created successfully.",
             )
     except Exception as exc:
         logger.error("Failed to parse image reply: %s", exc)
