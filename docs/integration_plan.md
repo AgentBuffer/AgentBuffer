@@ -41,34 +41,41 @@
 
 ## Conflict Resolution Log
 
-*(Updated as merges proceed)*
-
 ### Step 1: `architecture/cognition-agent-plan`
-- Status: Pending
-- Conflicts: —
+- **Status:** Merged — clean, no conflicts
+- **Tests:** 119 passed
 
 ### Step 2: `chore/backend-gap-analysis`
-- Status: Pending
-- Conflicts: —
+- **Status:** Merged — clean, no conflicts
+- **Tests:** 119 passed
 
 ### Step 3: `devin/1777136906-brandkit-editor`
-- Status: Pending
-- Conflicts: —
+- **Status:** Merged — clean, no conflicts
+- **Tests:** 119 passed
 
 ### Step 4: `devin/1777141260-image-creator-service`
-- Status: Pending
-- Conflicts: —
+- **Status:** Merged — 2 conflicts resolved
+- **Conflicts:**
+  - `README.md` (6 conflict regions): Combined detailed DeepWiki-style README (HEAD) with Image Creator additions. Added Image Creator to architecture diagram, agent roster, stage details, project structure, tech stack, and environment variables section.
+  - `uv.lock`: Regenerated lockfile via `uv lock` after taking theirs.
+- **Post-merge fix:** Resolved 2 E501 line-length violations in `services/head_agent/agent.py` (long string literals in image request/reply handlers).
+- **Tests:** 142 passed (23 new image_creator tests)
 
 ### Step 5: `devin/1777138553-content-calendar`
-- Status: Pending
-- Conflicts: —
+- **Status:** Merged — 2 conflicts resolved + missing functions restored
+- **Conflicts:**
+  - `gateway/main.py`: Combined comprehensive route-based gateway (from gap-analysis) with calendar endpoint (from content-calendar). Added `os`, `datetime`, `Query` imports; added `_monday_of()` helper and `/brands/{brand_id}/calendar` endpoint alongside all existing route routers.
+  - `services/head_agent/agent.py`: Merged BrandKit edit commands (brandkit-editor) with calendar/add-post commands (content-calendar) and approval flow. The brandkit-editor branch had refactored the head_agent and removed the approval flow, which the content-calendar branch depended on.
+- **Post-merge fix:** Restored 5 missing approval flow functions (`_handle_approval_reply`, `_parse_approval_text`, `_match_slot_id`, `_process_approval_decisions`, `_finalize_approved_slots`) and added missing `import re`.
+- **Tests:** 142 passed
 
 ---
 
 ## Post-Merge Validation Checklist
 
-- [ ] `pytest` — all test suites pass
-- [ ] `ruff check` — no lint violations
-- [ ] `ruff format --check` — formatting clean
-- [ ] `pnpm lint && pnpm typecheck` — web app clean
+- [x] `pytest` — 142 tests pass (video, carousel, design, image_creator, cognition agent)
+- [x] `ruff check` — no lint violations
+- [x] `ruff format` — formatted conflict-resolved files
+- [x] `pnpm lint` — web app clean (2 pre-existing warnings only)
+- [x] `pnpm typecheck` — web app clean
 - [ ] Main Agent → Cognition Agent routing works (mock test)
