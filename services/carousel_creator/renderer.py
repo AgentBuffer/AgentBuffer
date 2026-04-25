@@ -122,9 +122,7 @@ def render_slide(
     # Body text — centered in the middle
     if slide.body:
         body_wrapped = textwrap.fill(slide.body, width=BODY_WRAP_WIDTH)
-        body_bbox = draw.multiline_textbbox(
-            (0, 0), body_wrapped, font=font_regular, align="center"
-        )
+        body_bbox = draw.multiline_textbbox((0, 0), body_wrapped, font=font_regular, align="center")
         body_w = body_bbox[2] - body_bbox[0]
         body_h = body_bbox[3] - body_bbox[1]
         body_x = (SLIDE_WIDTH - body_w) // 2

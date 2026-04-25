@@ -41,3 +41,12 @@ jobs:
       - run: |
           cd services/publisher
           uv run pytest tests/ -v || echo "No tests yet"
+
+  test-carousel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: |
+          cd services/carousel_creator
+          uv run pytest tests/ -v
