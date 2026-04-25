@@ -66,9 +66,14 @@ export function CalendarView() {
 
   const reloadWeek = async () => {
     setLoading(true);
-    const data = await fetchCalendar("brand-001", weekStart);
-    setSlots(data.posts);
-    setLoading(false);
+    try {
+      const data = await fetchCalendar("brand-001", weekStart);
+      setSlots(data.posts);
+    } catch (err) {
+      console.error("Failed to reload calendar:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredSlots =

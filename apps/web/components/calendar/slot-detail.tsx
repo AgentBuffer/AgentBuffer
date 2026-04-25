@@ -42,18 +42,30 @@ function formatDateTime(iso: string): string {
 
 export function SlotDetail({ slot, onClose, onAction }: Props) {
   async function handleApprove() {
-    await approveSlot(slot.slot_id);
-    onAction();
+    try {
+      await approveSlot(slot.slot_id);
+      onAction();
+    } catch {
+      // silent — gateway returns early in mock mode
+    }
   }
 
   async function handleSkip() {
-    await skipSlot(slot.slot_id);
-    onAction();
+    try {
+      await skipSlot(slot.slot_id);
+      onAction();
+    } catch {
+      // silent — gateway returns early in mock mode
+    }
   }
 
   async function handleRegenerate() {
-    await regenerateSlot(slot.slot_id);
-    onAction();
+    try {
+      await regenerateSlot(slot.slot_id);
+      onAction();
+    } catch {
+      // silent — gateway returns early in mock mode
+    }
   }
 
   return (

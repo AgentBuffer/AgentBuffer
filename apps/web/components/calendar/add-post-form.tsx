@@ -31,14 +31,19 @@ export function AddPostForm({ defaultDate, onClose, onAdded }: Props) {
     e.preventDefault();
     if (!content.trim()) return;
     setSubmitting(true);
-    await addManualPost({
-      platform,
-      scheduled_for: `${defaultDate}T${time}:00Z`,
-      content_text: content,
-    });
-    setSubmitting(false);
-    onAdded();
-    onClose();
+    try {
+      await addManualPost({
+        platform,
+        scheduled_for: `${defaultDate}T${time}:00Z`,
+        content_text: content,
+      });
+      onAdded();
+      onClose();
+    } catch {
+      // allow user to retry
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
