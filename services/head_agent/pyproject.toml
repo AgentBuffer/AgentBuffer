@@ -1,0 +1,11 @@
+[project]
+name = "agentbuffer-head-agent"
+version = "0.1.0"
+description = "Head Agent orchestrator for AgentBuffer marketing pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "uagents>=0.20.0",
+    "uagents-core",
+    "openai",
+    "pydantic",
+]

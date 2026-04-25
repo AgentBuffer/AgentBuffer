@@ -115,3 +115,17 @@ class VideoResult(BaseModel):
     duration_seconds: int | None = None
     status: str
     error: str | None = None
+
+
+class MarketingAnalysis(BaseModel):
+    """LLM-generated marketing analysis of a business."""
+
+    brand_name: str
+    industry: str
+    competitive_positioning: str
+    key_differentiators: list[str]
+    target_audience_insights: str
+    recommended_platforms: list[Platform]
+    content_themes: list[str]
+    tone_guidelines: str
+    weekly_cadence: str

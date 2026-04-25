@@ -2,6 +2,13 @@
 name = "agentbuffer"
 version = "0.1.0"
 requires-python = ">=3.12"
+dependencies = [
+    "uagents>=0.20.0",
+    "uagents-core",
+    "openai",
+    "pydantic",
+    "google-genai>=1.0",
+]
 
 [tool.uv.workspace]
 members = ["services/*", "gateway"]
