@@ -96,13 +96,15 @@ def critique_slate(slate: Slate, brand: BrandKit) -> list[CriticVerdict]:
 
     slots_description = []
     for s in slate.slots:
-        slots_description.append({
-            "slot_id": s.slot_id,
-            "slot_number": s.slot_number,
-            "platform": s.platform.value,
-            "caption": s.caption,
-            "image_prompt": s.image_prompt,
-        })
+        slots_description.append(
+            {
+                "slot_id": s.slot_id,
+                "slot_number": s.slot_number,
+                "platform": s.platform.value,
+                "caption": s.caption,
+                "image_prompt": s.image_prompt,
+            }
+        )
 
     context = (
         f"Brand: {brand.name}\n"
@@ -131,19 +133,23 @@ def critique_slate(slate: Slate, brand: BrandKit) -> list[CriticVerdict]:
         avg = v_data.get("average", 0.0)
         if scores and not avg:
             avg = sum(s.score for s in scores) / len(scores)
-        verdicts.append(CriticVerdict(
-            slot_id=v_data["slot_id"],
-            scores=scores,
-            average=round(avg, 2),
-            approved=v_data.get("approved", avg >= 3.5),
-            summary=v_data.get("summary", ""),
-        ))
+        verdicts.append(
+            CriticVerdict(
+                slot_id=v_data["slot_id"],
+                scores=scores,
+                average=round(avg, 2),
+                approved=v_data.get("approved", avg >= 3.5),
+                summary=v_data.get("summary", ""),
+            )
+        )
 
     # Ensure at least one rejection
     if all(v.approved for v in verdicts) and verdicts:
         weakest = min(verdicts, key=lambda v: v.average)
         weakest.approved = False
-        weakest.summary = f"REJECTED — {weakest.summary} (Weakest in the slate, enforcing quality bar.)"
+        weakest.summary = (
+            f"REJECTED — {weakest.summary} (Weakest in the slate, enforcing quality bar.)"
+        )
 
     return verdicts
 
@@ -178,8 +184,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
     if text.startswith("[CRITIC_REQUEST:"):
         prefix_end = text.index("]")
-        session_id = text[len("[CRITIC_REQUEST:"):prefix_end]
-        payload_text = text[prefix_end + 1:].strip()
+        session_id = text[len("[CRITIC_REQUEST:") : prefix_end]
+        payload_text = text[prefix_end + 1 :].strip()
 
         try:
             payload = json.loads(payload_text)
@@ -204,7 +210,10 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     timestamp=datetime.now(tz=timezone.utc),
                     msg_id=uuid4(),
                     content=[
-                        TextContent(type="text", text=f"[CRITIC_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)})),
+                        TextContent(
+                            type="text",
+                            text=f"[CRITIC_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)}),
+                        ),
                         EndSessionContent(type="end-session"),
                     ],
                 ),
@@ -218,7 +227,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text="I'm the AgentBuffer Critic. I review content quality when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
+                        text=(
+                            "I'm the AgentBuffer Critic. I review content quality"
+                            " when dispatched by the Marketing Director."
+                            " Please chat with the main AgentBuffer agent instead."
+                        ),
                     ),
                     EndSessionContent(type="end-session"),
                 ],

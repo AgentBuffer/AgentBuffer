@@ -12,11 +12,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -35,7 +33,6 @@ from services.shared.models import (
 from services.video_creator import veo_client as veo_client_module
 from services.video_creator.agent import process_approved_slate
 from services.video_creator.veo_client import VeoClient
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -175,9 +172,7 @@ def _make_pending_then_done_operation(
 
 class TestVeoClientSuccess:
     @pytest.mark.asyncio()
-    async def test_successful_generation(
-        self, video_request: VideoRequest, tmp_path: Path
-    ) -> None:
+    async def test_successful_generation(self, video_request: VideoRequest, tmp_path: Path) -> None:
         mock_client = MagicMock()
         done_op = _make_done_operation()
         mock_client.models.generate_videos.return_value = done_op
@@ -195,9 +190,7 @@ class TestVeoClientSuccess:
         assert Path(result.local_path).suffix == ".mp4"
 
     @pytest.mark.asyncio()
-    async def test_video_file_is_written(
-        self, video_request: VideoRequest, tmp_path: Path
-    ) -> None:
+    async def test_video_file_is_written(self, video_request: VideoRequest, tmp_path: Path) -> None:
         mock_client = MagicMock()
         done_op = _make_done_operation()
         mock_client.models.generate_videos.return_value = done_op
@@ -214,9 +207,7 @@ class TestVeoClientSuccess:
 
 class TestVeoClientTimeout:
     @pytest.mark.asyncio()
-    async def test_timeout_returns_timeout_status(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_timeout_returns_timeout_status(self, video_request: VideoRequest) -> None:
         mock_client = MagicMock()
         never_done_op = MagicMock()
         never_done_op.done = False
@@ -236,9 +227,7 @@ class TestVeoClientTimeout:
         assert result.slot_id == "slot-001"
 
     @pytest.mark.asyncio()
-    async def test_timeout_does_not_raise(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_timeout_does_not_raise(self, video_request: VideoRequest) -> None:
         """Ensure timeouts never bubble up as exceptions."""
         mock_client = MagicMock()
         never_done_op = MagicMock()
@@ -259,9 +248,7 @@ class TestVeoClientTimeout:
 
 class TestVeoClientErrors:
     @pytest.mark.asyncio()
-    async def test_submission_error_returns_error_status(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_submission_error_returns_error_status(self, video_request: VideoRequest) -> None:
         mock_client = MagicMock()
         mock_client.models.generate_videos.side_effect = RuntimeError("API 500")
 
@@ -293,9 +280,7 @@ class TestVeoClientErrors:
         assert "Network down" in result.error
 
     @pytest.mark.asyncio()
-    async def test_empty_response_returns_error(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_empty_response_returns_error(self, video_request: VideoRequest) -> None:
         mock_client = MagicMock()
         op = MagicMock()
         op.done = True
@@ -310,9 +295,7 @@ class TestVeoClientErrors:
         assert "no videos" in result.error.lower()
 
     @pytest.mark.asyncio()
-    async def test_missing_video_uri_returns_error(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_missing_video_uri_returns_error(self, video_request: VideoRequest) -> None:
         mock_client = MagicMock()
         op = MagicMock()
         op.done = True
@@ -327,9 +310,7 @@ class TestVeoClientErrors:
         assert result.status == "error"
 
     @pytest.mark.asyncio()
-    async def test_errors_never_raise_exceptions(
-        self, video_request: VideoRequest
-    ) -> None:
+    async def test_errors_never_raise_exceptions(self, video_request: VideoRequest) -> None:
         """All error paths must return VideoResult, never raise."""
         mock_client = MagicMock()
         mock_client.models.generate_videos.side_effect = Exception("Catastrophic")
