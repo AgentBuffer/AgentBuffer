@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - YouTube Automation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="runPipeline()">
+            + New Video Pipeline
+        </button>
+        <button class="btn btn-secondary" onclick="generateIdeas()">
+            Generate Ideas
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" id="totalVideos">-</div>
+        <div class="stat-label">Total Videos</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="totalViews">-</div>
+        <div class="stat-label">Total Views</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="avgCTR">-</div>
+        <div class="stat-label">Avg CTR %</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="avgRetention">-</div>
+        <div class="stat-label">Avg Retention %</div>
+    </div>
+</div>
+
+<!-- Pipeline Status -->
+<div class="section">
+    <h2>Production Pipeline</h2>
+    <div class="pipeline-stages">
+        <div class="stage" id="stage-idea">
+            <div class="stage-header">
+                <span class="stage-icon">💡</span>
+                <span class="stage-name">Ideas</span>
+                <span class="stage-count" id="count-idea">0</span>
+            </div>
+        </div>
+        <div class="stage-arrow">→</div>
+        <div class="stage" id="stage-scripted">
+            <div class="stage-header">
+                <span class="stage-icon">📝</span>
+                <span class="stage-name">Scripted</span>
+                <span class="stage-count" id="count-scripted">0</span>
+            </div>
+        </div>
+        <div class="stage-arrow">→</div>
+        <div class="stage" id="stage-voiceover">
+            <div class="stage-header">
+                <span class="stage-icon">🎙️</span>
+                <span class="stage-name">Voiceover</span>
+                <span class="stage-count" id="count-voiceover_done">0</span>
+            </div>
+        </div>
+        <div class="stage-arrow">→</div>
+        <div class="stage" id="stage-thumbnail">
+            <div class="stage-header">
+                <span class="stage-icon">🖼️</span>
+                <span class="stage-name">Thumbnail</span>
+                <span class="stage-count" id="count-thumbnail_done">0</span>
+            </div>
+        </div>
+        <div class="stage-arrow">→</div>
+        <div class="stage" id="stage-published">
+            <div class="stage-header">
+                <span class="stage-icon">🚀</span>
+                <span class="stage-name">Published</span>
+                <span class="stage-count" id="count-published">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Videos -->
+<div class="section">
+    <h2>Recent Videos</h2>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Pillar</th>
+                    <th>Views</th>
+                    <th>CTR</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="recentVideos">
+                <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Upcoming Content -->
+<div class="section">
+    <h2>Upcoming Content</h2>
+    <div id="upcomingContent" class="upcoming-list">
+        <p class="empty-state">Loading calendar...</p>
+    </div>
+</div>
+
+<!-- Recommendations -->
+<div class="section">
+    <h2>Recommendations</h2>
+    <div id="recommendations" class="recommendations-list">
+        <p class="empty-state">Analyzing performance...</p>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+});
+
+async function loadDashboard() {
+    try {
+        // Load videos
+        const videosResp = await api('/api/videos?limit=10');
+        if (videosResp.videos) {
+            updatePipelineCounts(videosResp.videos);
+            renderRecentVideos(videosResp.videos);
+        }
+
+        // Load analytics
+        try {
+            const analytics = await api('/api/analytics/report');
+            document.getElementById('totalVideos').textContent = analytics.total_videos || 0;
+            document.getElementById('totalViews').textContent = formatNumber(analytics.total_views || 0);
+            document.getElementById('avgCTR').textContent = (analytics.avg_ctr || 0).toFixed(1) + '%';
+            document.getElementById('avgRetention').textContent = (analytics.avg_retention || 0).toFixed(1) + '%';
+
+            if (analytics.recommendations && analytics.recommendations.length) {
+                const recsHtml = analytics.recommendations.map(r =>
+                    `<div class="recommendation-card"><p>${r}</p></div>`
+                ).join('');
+                document.getElementById('recommendations').innerHTML = recsHtml;
+            } else {
+                document.getElementById('recommendations').innerHTML =
+                    '<p class="empty-state">Publish videos to get recommendations</p>';
+            }
+        } catch(e) {
+            document.getElementById('recommendations').innerHTML =
+                '<p class="empty-state">Analytics will appear after publishing videos</p>';
+        }
+
+        // Load upcoming
+        try {
+            const upcoming = await api('/api/calendar/upcoming?days=7');
+            if (upcoming.entries && upcoming.entries.length) {
+                const html = upcoming.entries.map(e => `
+                    <div class="upcoming-item">
+                        <span class="upcoming-date">${new Date(e.date).toLocaleDateString()}</span>
+                        <span class="upcoming-type badge badge-${e.type}">${e.type}</span>
+                        <span class="upcoming-platform">${e.platform}</span>
+                        <span class="upcoming-title">${e.title}</span>
+                    </div>
+                `).join('');
+                document.getElementById('upcomingContent').innerHTML = html;
+            }
+        } catch(e) {}
+
+    } catch (err) {
+        console.error('Dashboard load error:', err);
+    }
+}
+
+function updatePipelineCounts(videos) {
+    const counts = {};
+    videos.forEach(v => {
+        counts[v.status] = (counts[v.status] || 0) + 1;
+    });
+    ['idea', 'scripted', 'voiceover_done', 'thumbnail_done', 'published'].forEach(s => {
+        const el = document.getElementById(`count-${s}`);
+        if (el) el.textContent = counts[s] || 0;
+    });
+}
+
+function renderRecentVideos(videos) {
+    const tbody = document.getElementById('recentVideos');
+    if (!videos.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No videos yet. Create your first!</td></tr>';
+        return;
+    }
+    tbody.innerHTML = videos.map(v => `
+        <tr>
+            <td><a href="#" onclick="viewVideo(${v.id})">${v.title}</a></td>
+            <td><span class="badge badge-${v.status}">${v.status}</span></td>
+            <td>${v.pillar || '-'}</td>
+            <td>${formatNumber(v.views)}</td>
+            <td>${v.ctr ? v.ctr.toFixed(1) + '%' : '-'}</td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="generateScriptFor(${v.id})" title="Generate Script">📝</button>
+                <button class="btn btn-sm" onclick="generateVoiceover(${v.id})" title="Generate Voiceover">🎙️</button>
+                <button class="btn btn-sm" onclick="generateThumbnail(${v.id})" title="Generate Thumbnail">🖼️</button>
+                <button class="btn btn-sm" onclick="optimizeSEO(${v.id})" title="Optimize SEO">🔍</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function runPipeline() {
+    const title = prompt('Enter video title or topic:');
+    if (!title) return;
+
+    showToast('Starting full pipeline...', 'info');
+    try {
+        const result = await api('/api/pipeline/full', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, pillar: 'dark_psychology'}),
+        });
+
+        const successSteps = result.steps.filter(s => s.status === 'success').length;
+        showToast(`Pipeline complete! ${successSteps}/${result.steps.length} steps succeeded.`, 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('Pipeline error: ' + e.message, 'error');
+    }
+}
+
+async function generateIdeas() {
+    showToast('Generating ideas...', 'info');
+    try {
+        const result = await api('/api/generate/ideas', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({count: 10}),
+        });
+
+        const html = `
+            <h2>Video Ideas</h2>
+            <div class="ideas-list">
+                ${result.ideas.map((idea, i) => `
+                    <div class="idea-card">
+                        <h3>${i + 1}. ${idea.title}</h3>
+                        <p class="hook">"${idea.hook}"</p>
+                        <p class="outline">${idea.outline || ''}</p>
+                        <div class="idea-meta">
+                            <span class="badge">${idea.pillar || 'general'}</span>
+                            <span class="viral-score">Viral: ${idea.viral_score || '?'}/10</span>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="createFromIdea('${idea.title.replace(/'/g, "\\'")}')">
+                            Use This Idea
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        showModal(html);
+    } catch (e) {
+        showToast('Error generating ideas: ' + e.message, 'error');
+    }
+}
+
+async function createFromIdea(title) {
+    closeModal();
+    showToast('Creating video from idea...', 'info');
+    try {
+        const result = await api('/api/pipeline/full', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, pillar: 'dark_psychology'}),
+        });
+        showToast('Video created and pipeline started!', 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+async function viewVideo(id) {
+    try {
+        const video = await api(`/api/videos/${id}`);
+        const html = `
+            <h2>${video.title}</h2>
+            <div class="video-detail">
+                <div class="detail-row"><strong>Status:</strong> <span class="badge badge-${video.status}">${video.status}</span></div>
+                <div class="detail-row"><strong>Pillar:</strong> ${video.pillar || '-'}</div>
+                <div class="detail-row"><strong>Hook:</strong> "${video.hook || '-'}"</div>
+                ${video.youtube_url ? `<div class="detail-row"><strong>YouTube:</strong> <a href="${video.youtube_url}" target="_blank">${video.youtube_url}</a></div>` : ''}
+                <div class="detail-section">
+                    <h3>Script</h3>
+                    <pre class="script-preview">${video.script || 'No script generated yet'}</pre>
+                </div>
+                <div class="detail-section">
+                    <h3>SEO</h3>
+                    <p><strong>Tags:</strong> ${video.tags || '-'}</p>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-primary" onclick="generateScriptFor(${id})">Generate Script</button>
+                    <button class="btn btn-secondary" onclick="generateVoiceover(${id})">Generate Voiceover</button>
+                    <button class="btn btn-secondary" onclick="generateThumbnail(${id})">Generate Thumbnail</button>
+                    <button class="btn btn-secondary" onclick="optimizeSEO(${id})">Optimize SEO</button>
+                </div>
+            </div>
+        `;
+        showModal(html);
+    } catch (e) {
+        showToast('Error loading video: ' + e.message, 'error');
+    }
+}
+
+async function generateVoiceover(id) {
+    showToast('Generating voiceover...', 'info');
+    try {
+        const result = await api('/api/generate/voiceover', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({video_id: id, preset: 'authoritative_male'}),
+        });
+        showToast(`Voiceover generated! Duration: ${Math.round(result.duration_seconds)}s`, 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('Voiceover error: ' + e.message, 'error');
+    }
+}
+
+async function generateThumbnail(id) {
+    showToast('Generating thumbnail...', 'info');
+    try {
+        const result = await api('/api/generate/thumbnail', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({video_id: id, template: 'bold_text'}),
+        });
+        showToast('Thumbnail generated!', 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('Thumbnail error: ' + e.message, 'error');
+    }
+}
+
+async function optimizeSEO(id) {
+    showToast('Optimizing SEO...', 'info');
+    try {
+        const result = await api('/api/seo/optimize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({video_id: id}),
+        });
+        showToast('SEO optimized!', 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('SEO error: ' + e.message, 'error');
+    }
+}
+
+async function generateScriptFor(id) {
+    showToast('Generating script...', 'info');
+    try {
+        const video = await api(`/api/videos/${id}`);
+        const result = await api('/api/generate/script', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                title: video.title,
+                pillar: video.pillar || 'dark_psychology',
+                target_minutes: 10,
+                num_points: 7,
+            }),
+        });
+        showToast('Script generated!', 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast('Script error: ' + e.message, 'error');
+    }
+}
+</script>
+{% endblock %}
