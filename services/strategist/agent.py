@@ -124,15 +124,17 @@ def generate_slate(brand: BrandKit, analysis: MarketingAnalysis) -> Slate:
 
         scheduled = next_monday + timedelta(days=i, hours=9)
 
-        slots.append(ContentSlot(
-            slot_id=f"slot-{uuid4().hex[:8]}",
-            slot_number=slot_data.get("slot_number", i + 1),
-            caption=slot_data.get("caption", ""),
-            image_prompt=slot_data.get("image_prompt", ""),
-            platform=platform,
-            scheduled_for=scheduled,
-            status="proposed",
-        ))
+        slots.append(
+            ContentSlot(
+                slot_id=f"slot-{uuid4().hex[:8]}",
+                slot_number=slot_data.get("slot_number", i + 1),
+                caption=slot_data.get("caption", ""),
+                image_prompt=slot_data.get("image_prompt", ""),
+                platform=platform,
+                scheduled_for=scheduled,
+                status="proposed",
+            )
+        )
 
     slate_id = f"slate-{uuid4().hex[:8]}"
     return Slate(
@@ -175,13 +177,15 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     # Check if this is a request from the Head Agent
     if text.startswith("[STRATEGIST_REQUEST:"):
         prefix_end = text.index("]")
-        session_id = text[len("[STRATEGIST_REQUEST:"):prefix_end]
-        payload_text = text[prefix_end + 1:].strip()
+        session_id = text[len("[STRATEGIST_REQUEST:") : prefix_end]
+        payload_text = text[prefix_end + 1 :].strip()
 
         try:
             payload = json.loads(payload_text)
             brand = BrandKit(**payload["brand"])
             analysis = MarketingAnalysis(**payload["analysis"])
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
             slate = generate_slate(brand, analysis)
 
             reply_text = f"[STRATEGIST_REPLY:{session_id}]\n{slate.json()}"
@@ -193,6 +197,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     content=[TextContent(type="text", text=reply_text)],
                 ),
             )
+            logger.info(
+                "Strategist completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
+            )
         except Exception as exc:
             logger.error("Strategist processing failed: %s", exc)
             await ctx.send(
@@ -201,7 +211,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     timestamp=datetime.now(tz=timezone.utc),
                     msg_id=uuid4(),
                     content=[
-                        TextContent(type="text", text=f"[STRATEGIST_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)})),
+                        TextContent(
+                            type="text",
+                            text=f"[STRATEGIST_REPLY:{session_id}]\n"
+                            + json.dumps({"error": str(exc)}),
+                        ),
                         EndSessionContent(type="end-session"),
                     ],
                 ),

@@ -59,9 +59,7 @@ async def process_approved_slate(
         A list of VideoResult objects — one per approved slot.
     """
     client = veo_client or VeoClient()
-    approved_slot_ids = {
-        v.slot_id for v in slate.verdicts if v.approved
-    }
+    approved_slot_ids = {v.slot_id for v in slate.verdicts if v.approved}
 
     results: list[VideoResult] = []
     for slot in slate.slate.slots:
@@ -148,17 +146,25 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
     if text.startswith("[VIDEO_REQUEST:"):
         prefix_end = text.index("]")
-        session_id = text[len("[VIDEO_REQUEST:"):prefix_end]
-        payload_text = text[prefix_end + 1:].strip()
+        session_id = text[len("[VIDEO_REQUEST:") : prefix_end]
+        payload_text = text[prefix_end + 1 :].strip()
 
         try:
             payload = json.loads(payload_text)
             approved_slate = ApprovedSlate(**payload["approved_slate"])
             brand = BrandKit(**payload["brand"])
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
 
             results = await process_approved_slate(approved_slate, brand)
 
             reply_text = f"[VIDEO_REPLY:{session_id}]\n{json.dumps([r.dict() for r in results], default=str)}"
+            logger.info(
+                "Video Creator completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
+            )
             await ctx.send(
                 sender,
                 ChatMessage(
@@ -175,7 +181,10 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     timestamp=datetime.now(tz=timezone.utc),
                     msg_id=uuid4(),
                     content=[
-                        TextContent(type="text", text=f"[VIDEO_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)})),
+                        TextContent(
+                            type="text",
+                            text=f"[VIDEO_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)}),
+                        ),
                         EndSessionContent(type="end-session"),
                     ],
                 ),

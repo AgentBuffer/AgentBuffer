@@ -97,6 +97,28 @@ class CarouselResult(BaseModel):
     error: str | None = None
 
 
+class BrandRegistryEntry(BaseModel):
+    """A single brand owned by a user."""
+
+    brand_id: str
+    brand_name: str
+    created_at: datetime
+    last_active: datetime
+
+
+class PerformanceRecord(BaseModel):
+    """Engagement metrics for a published post."""
+
+    post_id: str
+    brand_id: str
+    user_id: str
+    platform: Platform
+    impressions: int = 0
+    engagements: int = 0
+    clicks: int = 0
+    recorded_at: datetime
+
+
 class AgentEnvelope(BaseModel):
     from_agent: str
     to_agent: str
@@ -104,7 +126,6 @@ class AgentEnvelope(BaseModel):
     payload: dict
     signature: str
     timestamp: datetime
-
 
 
 class TrendContext(BaseModel):
