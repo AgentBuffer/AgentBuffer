@@ -55,7 +55,7 @@ def _build_instagram_prompt(
     brand: BrandKit,
 ) -> str:
     return (
-        f"Create a stunning 4:5 vertical Instagram image. "
+        f"Create a stunning 3:4 vertical Instagram image. "
         f"Aesthetic, lifestyle photography style. "
         f"Visual concept: {visual}. "
         f"Context: {caption}. "
