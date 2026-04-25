@@ -8,8 +8,8 @@ Pipeline stages:
   2. ANALYSIS     — generate marketing analysis via LLM
   3. STRATEGIZE   — dispatch to Strategist, await Slate
   4. CRITIQUE     — dispatch to Critic, await verdicts
-  5. APPROVAL     — approval queue, user reviews & decides
-  6. PUBLISH      — dispatch approved slots to Publisher
+  5. VIDEO        — dispatch to Video Creator (if video slots exist)
+  6. PUBLISH      — dispatch to Publisher
   7. REPORT       — compile final report, send to user
 """
 
@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -34,6 +33,7 @@ from services.head_agent.analysis import (
     extract_brand_kit,
     generate_marketing_analysis,
 )
+from services.head_agent.brandkit_commands import dispatch_brandkit_command
 from services.head_agent.config import (
     CRITIC_ADDRESS,
     HEAD_AGENT_PORT,
@@ -42,7 +42,7 @@ from services.head_agent.config import (
     PUBLISHER_ADDRESS,
     STRATEGIST_ADDRESS,
 )
-from services.performance_harvester.summary import build_performance_summary
+from services.shared.brandkit_store import load_brandkit
 
 logger = logging.getLogger(__name__)
 
@@ -57,21 +57,13 @@ agent = Agent(
 protocol = Protocol(spec=chat_protocol_spec)
 
 # ── State keys in ctx.storage ──
-# session:{session_id}:stage                 — current pipeline stage
-# session:{session_id}:sender                — original user address
-# session:{session_id}:brand                 — serialized BrandKit
-# session:{session_id}:analysis              — serialized MarketingAnalysis
-# session:{session_id}:slate                 — serialized Slate
-# session:{session_id}:verdicts              — serialized CriticVerdicts
-# session:{session_id}:user_text             — original user input
-# session:{session_id}:approval_requested_at — ISO timestamp of approval gate entry
-# session:{session_id}:publish_results       — serialized PublishResults
-# session:{session_id}:regen_new_slot:{slot} — temp storage for regenerated slot
-# approval_queue:{session_id}                — list of approval queue item dicts
-# active_approval_sessions                   — JSON list of session_ids
-# sender_session:{sender}                    — maps sender address to session_id
-
-APPROVAL_TIMEOUT_SECONDS = 86400  # 24 hours
+# session:{session_id}:stage    — current pipeline stage
+# session:{session_id}:sender   — original user address
+# session:{session_id}:brand    — serialized BrandKit
+# session:{session_id}:analysis — serialized MarketingAnalysis
+# session:{session_id}:slate    — serialized Slate from Strategist
+# session:{session_id}:verdicts — serialized CriticVerdicts
+# sender_session:{sender}       — maps sender address to session_id
 
 
 async def _send_status(ctx: Context, recipient: str, text: str) -> None:
@@ -111,32 +103,8 @@ def _load(ctx: Context, session_id: str, key: str) -> str | None:
 
 def _cleanup_session(ctx: Context, session_id: str) -> None:
     """Remove all session keys from storage."""
-    for key in (
-        "stage",
-        "sender",
-        "brand",
-        "analysis",
-        "slate",
-        "verdicts",
-        "user_text",
-        "approval_requested_at",
-        "publish_results",
-        "perf_context_used",
-    ):
+    for key in ("stage", "sender", "brand", "analysis", "slate", "verdicts", "user_text"):
         ctx.storage.remove(f"session:{session_id}:{key}")
-    ctx.storage.remove(f"approval_queue:{session_id}")
-    _remove_from_active_approvals(ctx, session_id)
-
-
-def _remove_from_active_approvals(ctx: Context, session_id: str) -> None:
-    """Remove a session from the active approval tracking list."""
-    active_json = ctx.storage.get("active_approval_sessions")
-    if not active_json:
-        return
-    sessions = json.loads(active_json)
-    if session_id in sessions:
-        sessions.remove(session_id)
-    ctx.storage.set("active_approval_sessions", json.dumps(sessions))
 
 
 # ── Incoming chat from user (via ASI:One) ──
@@ -145,6 +113,7 @@ def _remove_from_active_approvals(ctx: Context, session_id: str) -> None:
 @protocol.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     """Entry point: user sends a business description, or a sub-agent replies."""
+    # Acknowledge receipt immediately
     await ctx.send(
         sender,
         ChatAcknowledgement(
@@ -153,6 +122,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         ),
     )
 
+    # Extract text
     text = ""
     for item in msg.content:
         if isinstance(item, TextContent):
@@ -166,30 +136,31 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         )
         return
 
-    # Sub-agent replies
+    # Check if this is a sub-agent reply (Strategist or Critic).
+    # Sub-agents prefix replies with [STRATEGIST_REPLY:…] or [CRITIC_REPLY:…]
     if text.startswith("[STRATEGIST_REPLY:"):
         await _handle_strategist_reply(ctx, sender, text)
         return
     if text.startswith("[CRITIC_REPLY:"):
         await _handle_critic_reply(ctx, sender, text)
         return
-    if text.startswith("[STRATEGIST_REGEN_REPLY:"):
-        await _handle_strategist_regen_reply(ctx, sender, text)
-        return
-    if text.startswith("[PUBLISH_REPLY:"):
-        await _handle_publish_reply(ctx, sender, text)
+
+    # ── BrandKit edit commands ──
+    bk_result = _try_brandkit_command(ctx, sender, text)
+    if bk_result is not None:
+        response_text, kit_modified = bk_result
+        await _send_status(ctx, sender, response_text)
+        if kit_modified:
+            await _handle_brandkit_updated(ctx, sender)
         return
     if text.startswith("[IMAGE_REPLY:"):
         await _handle_image_reply(ctx, sender, text)
         return
 
-    # Check if this is an approval reply from a user with an active session
-    existing_session_id = ctx.storage.get(f"sender_session:{sender}")
-    if existing_session_id:
-        stage = _load(ctx, existing_session_id, "stage")
-        if stage == "awaiting_approval":
-            await _handle_approval_reply(ctx, existing_session_id, sender, text)
-            return
+    # ── Regenerate slate command ──
+    if text.strip().lower() == "regenerate slate":
+        await _handle_regenerate_slate(ctx, sender)
+        return
 
     # Otherwise, this is a new user request
     session_id = str(uuid4())
@@ -199,9 +170,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
     # Stage 1: Brand extraction
     await _send_status(
-        ctx,
-        sender,
-        "Analyzing your business... extracting brand identity and positioning.",
+        ctx, sender, "Analyzing your business... extracting brand identity and positioning."
     )
 
     try:
@@ -211,9 +180,9 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         await _send_final(
             ctx,
             sender,
-            "I had trouble understanding your business description. Could you provide "
-            "more detail about your brand name, industry, target audience, and brand "
-            f"voice?\n\nError: {exc}",
+            "I had trouble understanding your business description. "
+            "Could you provide more detail about your brand name, "
+            f"industry, target audience, and brand voice?\n\nError: {exc}",
         )
         return
 
@@ -234,16 +203,13 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         analysis = generate_marketing_analysis(brand, text)
     except Exception as exc:
         logger.error("Marketing analysis failed: %s", exc)
-        await _send_final(
-            ctx,
-            sender,
-            f"Marketing analysis generation encountered an error: {exc}",
-        )
+        await _send_final(ctx, sender, f"Marketing analysis generation encountered an error: {exc}")
         return
 
     _store(ctx, session_id, "analysis", analysis.json())
     _store(ctx, session_id, "stage", "strategize")
 
+    # Send analysis summary to user
     analysis_summary = (
         f"MARKETING ANALYSIS — {analysis.brand_name}\n"
         f"{'=' * 40}\n"
@@ -251,8 +217,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         f"Key Differentiators:\n"
         + "\n".join(f"  - {d}" for d in analysis.key_differentiators)
         + f"\n\nTarget Audience: {analysis.target_audience_insights}\n"
-        f"Recommended Platforms: "
-        f"{', '.join(p.value for p in analysis.recommended_platforms)}\n"
+        f"Recommended Platforms: {', '.join(p.value for p in analysis.recommended_platforms)}\n"
         f"Content Themes: {', '.join(analysis.content_themes)}\n"
         f"Tone: {analysis.tone_guidelines}\n"
         f"Cadence: {analysis.weekly_cadence}\n\n"
@@ -260,32 +225,18 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     )
     await _send_status(ctx, sender, analysis_summary)
 
-    # Stage 3: Fetch performance context (if available) and dispatch to Strategist
-    perf_summary = build_performance_summary(ctx, brand.brand_id)
-    perf_context_used = perf_summary is not None
-    _store(ctx, session_id, "perf_context_used", str(perf_context_used).lower())
-
-    perf_payload: dict | None = None
-    if perf_summary:
-        perf_payload = perf_summary.model_dump()
-        await _send_status(
-            ctx,
-            sender,
-            "Found historical performance data \u2014 the Strategist will use it to "
-            "optimise content types and scheduling.",
-        )
-
+    # Stage 3: Dispatch to Strategist
     strategist_payload = json.dumps(
         {
             "session_id": session_id,
             "brand": json.loads(brand.json()),
             "analysis": json.loads(analysis.json()),
-            "performance_context": perf_payload,
         }
     )
 
     if not STRATEGIST_ADDRESS:
-        await _run_strategist_inline(ctx, session_id, sender, brand, analysis, perf_summary)
+        # If no strategist address, run strategist inline (for local testing)
+        await _run_strategist_inline(ctx, session_id, sender, brand, analysis)
         return
 
     await ctx.send(
@@ -295,29 +246,21 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             msg_id=uuid4(),
             content=[
                 TextContent(
-                    type="text",
-                    text=f"[STRATEGIST_REQUEST:{session_id}]\n{strategist_payload}",
+                    type="text", text=f"[STRATEGIST_REQUEST:{session_id}]\n{strategist_payload}"
                 )
             ],
         ),
     )
 
 
-# ── Strategist handling ──
-
-
-async def _run_strategist_inline(ctx, session_id, sender, brand, analysis, perf_summary=None):
-    """Run the strategist logic inline when no external strategist is configured."""
+async def _run_strategist_inline(ctx, session_id, sender, brand, analysis):
+    """Run the strategist logic inline when no external strategist agent is configured."""
     from services.strategist.agent import generate_slate
 
-    await _send_status(
-        ctx,
-        sender,
-        "Strategist is crafting your 7-day content slate...",
-    )
+    await _send_status(ctx, sender, "Strategist is crafting your 7-day content slate...")
 
     try:
-        slate = generate_slate(brand, analysis, performance_context=perf_summary)
+        slate = generate_slate(brand, analysis)
     except Exception as exc:
         logger.error("Inline strategist failed: %s", exc)
         await _send_final(ctx, sender, f"Content slate generation failed: {exc}")
@@ -342,12 +285,11 @@ async def _run_strategist_inline(ctx, session_id, sender, brand, analysis, perf_
         await _run_critic_inline(ctx, session_id, sender, slate)
         return
 
-    brand_json = _load(ctx, session_id, "brand")
     critic_payload = json.dumps(
         {
             "session_id": session_id,
             "slate": json.loads(slate.json()),
-            "brand": json.loads(brand_json) if brand_json else {},
+            "brand": json.loads(brand.json()),
         }
     )
     await ctx.send(
@@ -356,17 +298,53 @@ async def _run_strategist_inline(ctx, session_id, sender, brand, analysis, perf_
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
             content=[
-                TextContent(
-                    type="text",
-                    text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}",
-                )
+                TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")
             ],
         ),
     )
 
 
+async def _run_critic_inline(ctx, session_id, sender, slate):
+    """Run the critic logic inline when no external critic agent is configured."""
+    from services.critic.agent import critique_slate
+
+    brand_json = _load(ctx, session_id, "brand")
+    from services.shared.models import BrandKit as BrandKitModel
+
+    brand = BrandKitModel.model_validate_json(brand_json)
+
+    await _send_status(ctx, sender, "Critic is reviewing each content piece on 6 quality axes...")
+
+    try:
+        verdicts = critique_slate(slate, brand)
+    except Exception as exc:
+        logger.error("Inline critic failed: %s", exc)
+        await _send_final(ctx, sender, f"Critic review failed: {exc}")
+        return
+
+    _store(ctx, session_id, "verdicts", json.dumps([v.dict() for v in verdicts]))
+
+    approved = [v for v in verdicts if v.approved]
+    rejected = [v for v in verdicts if not v.approved]
+
+    critic_summary = (
+        f"CRITIC REVIEW\n{'=' * 40}\n"
+        f"{len(approved)}/{len(verdicts)} slots approved\n"
+        f"{len(rejected)}/{len(verdicts)} slots rejected\n\n"
+    )
+    for v in verdicts:
+        status = "APPROVED" if v.approved else "REJECTED"
+        critic_summary += f"  Slot {v.slot_id}: [{status}] avg={v.average:.1f}/5.0 — {v.summary}\n"
+
+    await _send_status(ctx, sender, critic_summary)
+
+    # Compile final report
+    await _compile_final_report(ctx, session_id, sender)
+
+
 async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None:
     """Handle the Strategist sub-agent's reply with the generated Slate."""
+    # Parse session_id from prefix
     prefix_end = text.index("]")
     session_id = text[len("[STRATEGIST_REPLY:") : prefix_end]
     payload_text = text[prefix_end + 1 :].strip()
@@ -383,11 +361,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
         slate = Slate(**slate_data)
     except Exception as exc:
         logger.error("Failed to parse strategist reply: %s", exc)
-        await _send_final(
-            ctx,
-            user_sender,
-            f"Strategist returned invalid data: {exc}",
-        )
+        await _send_final(ctx, user_sender, f"Strategist returned invalid data: {exc}")
         return
 
     _store(ctx, session_id, "slate", slate.json())
@@ -424,10 +398,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
             content=[
-                TextContent(
-                    type="text",
-                    text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}",
-                )
+                TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")
             ],
         ),
     )
@@ -537,43 +508,13 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     )
 
 
+
 async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
     """Handle the Critic sub-agent's reply with verdicts."""
     prefix_end = text.index("]")
-    raw_session_id = text[len("[CRITIC_REPLY:") : prefix_end]
+    session_id = text[len("[CRITIC_REPLY:") : prefix_end]
     payload_text = text[prefix_end + 1 :].strip()
 
-    # Check if this is a regeneration critique reply
-    if ":regen:" in raw_session_id:
-        session_id, _, regen_slot_id = raw_session_id.partition(":regen:")
-        user_sender = _load(ctx, session_id, "sender")
-        if not user_sender:
-            logger.error("No sender for regen session %s", session_id)
-            return
-        try:
-            from services.shared.models import CriticVerdict
-
-            verdicts_data = json.loads(payload_text)
-            verdicts = [CriticVerdict(**v) for v in verdicts_data]
-        except Exception as exc:
-            logger.error("Failed to parse regen critic reply: %s", exc)
-            await _send_status(
-                ctx,
-                user_sender,
-                f"Quality review of regenerated slot failed: {exc}",
-            )
-            return
-        verdict = verdicts[0] if verdicts else None
-        await _process_regen_critique_result(
-            ctx,
-            session_id,
-            user_sender,
-            regen_slot_id,
-            verdict,
-        )
-        return
-
-    session_id = raw_session_id
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
         logger.error("No sender found for session %s", session_id)
@@ -586,11 +527,7 @@ async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
         verdicts = [CriticVerdict(**v) for v in verdicts_data]
     except Exception as exc:
         logger.error("Failed to parse critic reply: %s", exc)
-        await _send_final(
-            ctx,
-            user_sender,
-            f"Critic returned invalid data: {exc}",
-        )
+        await _send_final(ctx, user_sender, f"Critic returned invalid data: {exc}")
         return
 
     _store(ctx, session_id, "verdicts", json.dumps(verdicts_data))
@@ -1432,34 +1369,21 @@ async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
     await _compile_final_report(ctx, session_id, user_sender)
 
 
-# ── Final Report ──
-
-
-async def _compile_final_report(
-    ctx: Context,
-    session_id: str,
-    recipient: str,
-) -> None:
+async def _compile_final_report(ctx: Context, session_id: str, recipient: str) -> None:
     """Compile all pipeline results into a final report and send to user."""
     from services.shared.models import (
         CriticVerdict,
         MarketingAnalysis,
-        PublishResult,
         Slate,
     )
 
     analysis_json = _load(ctx, session_id, "analysis")
     slate_json = _load(ctx, session_id, "slate")
     verdicts_json = _load(ctx, session_id, "verdicts")
-    publish_json = _load(ctx, session_id, "publish_results")
 
     analysis = MarketingAnalysis.parse_raw(analysis_json) if analysis_json else None
     slate = Slate.parse_raw(slate_json) if slate_json else None
     verdicts = [CriticVerdict(**v) for v in json.loads(verdicts_json)] if verdicts_json else []
-    publish_results = [PublishResult(**r) for r in json.loads(publish_json)] if publish_json else []
-
-    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
-    queue_items = json.loads(queue_json) if queue_json else []
 
     report_parts = []
 
@@ -1472,8 +1396,7 @@ async def _compile_final_report(
             f"Key Differentiators:\n"
             + "\n".join(f"  - {d}" for d in analysis.key_differentiators)
             + f"\n\nAudience Insights: {analysis.target_audience_insights}\n"
-            f"Platforms: "
-            f"{', '.join(p.value for p in analysis.recommended_platforms)}\n"
+            f"Platforms: {', '.join(p.value for p in analysis.recommended_platforms)}\n"
             f"Themes: {', '.join(analysis.content_themes)}\n"
             f"Tone: {analysis.tone_guidelines}\n"
             f"Cadence: {analysis.weekly_cadence}"
@@ -1483,37 +1406,13 @@ async def _compile_final_report(
     if slate:
         slot_lines = []
         for s in slate.slots:
-            verdict = next(
-                (v for v in verdicts if v.slot_id == s.slot_id),
-                None,
-            )
-            queue_item = next(
-                (qi for qi in queue_items if qi["slot_id"] == s.slot_id),
-                None,
-            )
-
-            status_parts = []
+            verdict = next((v for v in verdicts if v.slot_id == s.slot_id), None)
+            status = ""
             if verdict:
-                critic_status = "APPROVED" if verdict.approved else "REJECTED"
-                status_parts.append(
-                    f"{critic_status} ({verdict.average:.1f}/5.0)",
-                )
-            if queue_item:
-                status_parts.append(queue_item["status"].upper())
-
-            pub = next(
-                (r for r in publish_results if r.slot_id == s.slot_id),
-                None,
-            )
-            if pub:
-                pub_status = "PUBLISHED" if pub.success else f"FAILED: {pub.error}"
-                status_parts.append(pub_status)
-                if pub.permalink:
-                    status_parts.append(pub.permalink)
-
-            status_str = " | ".join(status_parts) if status_parts else ""
+                status = " APPROVED" if verdict.approved else " REJECTED"
+                status += f" ({verdict.average:.1f}/5.0)"
             slot_lines.append(
-                f"  {s.slot_number}. [{s.platform.value.upper()}] {status_str}\n"
+                f"  {s.slot_number}. [{s.platform.value.upper()}]{status}\n"
                 f"     Caption: {s.caption}\n"
                 f"     Visual: {s.image_prompt}"
             )
@@ -1524,38 +1423,25 @@ async def _compile_final_report(
 
     # Critic Summary
     if verdicts:
-        approved_count = sum(1 for v in verdicts if v.approved)
-        rejected_count = sum(1 for v in verdicts if not v.approved)
+        approved = sum(1 for v in verdicts if v.approved)
+        rejected = sum(1 for v in verdicts if not v.approved)
         report_parts.append(
             f"\nCRITIC SUMMARY\n{'=' * 50}\n"
-            f"{approved_count} approved / {rejected_count} rejected "
-            f"out of {len(verdicts)} total"
+            f"{approved} approved / {rejected} rejected out of {len(verdicts)} total"
         )
 
-    # Approval Summary
-    if queue_items:
-        approved_pub = sum(1 for qi in queue_items if qi["status"] == "approved")
-        skipped = sum(1 for qi in queue_items if qi["status"] == "skipped")
-        report_parts.append(
-            f"\nAPPROVAL SUMMARY\n{'=' * 50}\n"
-            f"{approved_pub} approved / {skipped} skipped "
-            f"out of {len(queue_items)} total"
-        )
-
-    # Publishing Summary
-    if publish_results:
-        success = sum(1 for r in publish_results if r.success)
-        failed = sum(1 for r in publish_results if not r.success)
-        report_parts.append(
-            f"\nPUBLISHING SUMMARY\n{'=' * 50}\n"
-            f"{success} published / {failed} failed "
-            f"out of {len(publish_results)} total"
-        )
-
-    # Performance context flag
-    perf_flag_raw = _load(ctx, session_id, "perf_context_used")
-    perf_context_used = perf_flag_raw == "true"
-    report_parts.append(f"\nPERFORMANCE DATA\n{'=' * 50}\nperf_context_used: {perf_context_used}")
+        # Surface rule compliance failures
+        rule_failures = []
+        for v in verdicts:
+            for s in v.scores:
+                if s.axis == "Rule Compliance" and s.score < 6:
+                    rule_failures.append(
+                        f"  Slot {v.slot_id}: Rule Compliance {s.score}/10 — {s.reasoning}"
+                    )
+        if rule_failures:
+            report_parts.append(
+                f"\nRULE COMPLIANCE ALERTS\n{'=' * 50}\n" + "\n".join(rule_failures)
+            )
 
     report_parts.append(
         "\n\nThis marketing plan was generated by AgentBuffer's "
@@ -1570,59 +1456,103 @@ async def _compile_final_report(
     _cleanup_session(ctx, session_id)
 
 
-# ── 24h Auto-Approve Timeout ──
+# ── BrandKit command routing ──
 
 
-@agent.on_interval(period=3600)
-async def check_approval_timeouts(ctx: Context):
-    """Auto-approve all pending slots if 24h have passed with no response."""
-    active_json = ctx.storage.get("active_approval_sessions")
-    if not active_json:
-        return
+def _try_brandkit_command(ctx: Context, sender: str, text: str) -> tuple[str, bool] | None:
+    """Attempt to match *text* as a BrandKit command.
 
-    active_sessions = json.loads(active_json)
-    now = datetime.now(tz=timezone.utc)
+    Returns ``(response, kit_modified)`` or ``None`` if not a BrandKit command.
+    """
+    # Derive user/brand ids from the active session
+    session_id = ctx.storage.get(f"sender_session:{sender}")
+    user_id, brand_id = "default", "default"
+    if session_id:
+        brand_raw = _load(ctx, session_id, "brand")
+        if brand_raw:
+            data = json.loads(brand_raw) if isinstance(brand_raw, str) else brand_raw
+            user_id = data.get("org_id", "default")
+            brand_id = data.get("brand_id", "default")
 
-    for session_id in list(active_sessions):
-        ts_str = _load(ctx, session_id, "approval_requested_at")
-        if not ts_str:
-            continue
+    return dispatch_brandkit_command(ctx, user_id, brand_id, text)
 
-        requested_at = datetime.fromisoformat(ts_str)
-        elapsed = (now - requested_at).total_seconds()
 
-        if elapsed < APPROVAL_TIMEOUT_SECONDS:
-            continue
-
-        queue_json = ctx.storage.get(f"approval_queue:{session_id}")
-        if not queue_json:
-            continue
-
-        queue_items = json.loads(queue_json)
-        has_pending = False
-        for item in queue_items:
-            if item["status"] == "pending":
-                item["status"] = "approved"
-                has_pending = True
-
-        if not has_pending:
-            continue
-
-        ctx.storage.set(
-            f"approval_queue:{session_id}",
-            json.dumps(queue_items),
-        )
-
-        sender = _load(ctx, session_id, "sender")
-        if sender:
+async def _handle_brandkit_updated(ctx: Context, sender: str) -> None:
+    """Set the propagation flag and notify the user."""
+    session_id = ctx.storage.get(f"sender_session:{sender}")
+    if session_id:
+        # Only set flag if a slate has already been generated in this session
+        slate_json = _load(ctx, session_id, "slate")
+        if slate_json:
+            ctx.storage.set(f"session:{session_id}:brandkit_updated", "true")
             await _send_status(
                 ctx,
                 sender,
-                "24 hours have passed with no approval decisions. "
-                "Auto-approving all pending slots and proceeding to "
-                "publish...",
+                "BrandKit updated. Changes will apply to your next content slate. "
+                "Reply 'regenerate slate' to apply them to the current queue.",
             )
-            await _finalize_approved_slots(ctx, session_id, sender)
+
+
+async def _handle_regenerate_slate(ctx: Context, sender: str) -> None:
+    """Re-run the Strategist -> Critic pipeline with the updated BrandKit."""
+    session_id = ctx.storage.get(f"sender_session:{sender}")
+    if not session_id:
+        await _send_status(ctx, sender, "No active session found.")
+        return
+
+    brand_raw = _load(ctx, session_id, "brand")
+    analysis_raw = _load(ctx, session_id, "analysis")
+    if not brand_raw or not analysis_raw:
+        await _send_status(
+            ctx, sender, "Cannot regenerate — brand data or analysis missing from this session."
+        )
+        return
+
+    from services.shared.models import BrandKit as BrandKitModel
+    from services.shared.models import MarketingAnalysis
+
+    brand = BrandKitModel.model_validate_json(brand_raw)
+    user_id = brand.org_id
+    brand_id_val = brand.brand_id
+
+    # Load the updated BrandKit from versioned storage
+    updated_kit = load_brandkit(ctx.storage, user_id, brand_id_val)
+    if updated_kit:
+        brand = updated_kit
+        _store(ctx, session_id, "brand", brand.model_dump_json())
+
+    analysis = MarketingAnalysis.model_validate_json(analysis_raw)
+
+    # Clear old verdicts
+    ctx.storage.remove(f"session:{session_id}:verdicts")
+    ctx.storage.remove(f"session:{session_id}:brandkit_updated")
+    _store(ctx, session_id, "stage", "strategize")
+
+    await _send_status(ctx, sender, "Regenerating content slate with your updated BrandKit...")
+
+    if not STRATEGIST_ADDRESS:
+        await _run_strategist_inline(ctx, session_id, sender, brand, analysis)
+        return
+
+    strategist_payload = json.dumps(
+        {
+            "session_id": session_id,
+            "brand": json.loads(brand.model_dump_json()),
+            "analysis": json.loads(analysis.model_dump_json()),
+        }
+    )
+    await ctx.send(
+        STRATEGIST_ADDRESS,
+        ChatMessage(
+            timestamp=datetime.now(tz=timezone.utc),
+            msg_id=uuid4(),
+            content=[
+                TextContent(
+                    type="text", text=f"[STRATEGIST_REQUEST:{session_id}]\n{strategist_payload}"
+                )
+            ],
+        ),
+    )
 
 
 @protocol.on_message(ChatAcknowledgement)
