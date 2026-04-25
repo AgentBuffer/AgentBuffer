@@ -58,4 +58,4 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: |
           cd services/carousel_creator
-          uv run pytest tests/ -v
+          uv run --extra test pytest tests/ -v

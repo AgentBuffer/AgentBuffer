@@ -176,7 +176,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 session_id,
             )
 
-            reply_text = f"[PUBLISH_REPLY:{session_id}]\n{json.dumps([r.dict() for r in results], default=str)}"
+            results_json = json.dumps(
+                [r.dict() for r in results],
+                default=str,
+            )
+            reply_text = f"[PUBLISH_REPLY:{session_id}]\n{results_json}"
             await ctx.send(
                 sender,
                 ChatMessage(
@@ -211,7 +215,10 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text="I'm the AgentBuffer Publisher. I publish approved content to social media platforms when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
+                        text="I'm the AgentBuffer Publisher. I publish approved content to "
+                        "social media platforms when dispatched by the Marketing "
+                        "Director. Please chat with the main AgentBuffer agent "
+                        "instead.",
                     ),
                     EndSessionContent(type="end-session"),
                 ],

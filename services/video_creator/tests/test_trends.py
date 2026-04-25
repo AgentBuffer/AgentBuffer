@@ -16,7 +16,6 @@ from services.shared.models import (
 from services.video_creator.config import ASPECT_RATIOS
 from services.video_creator.trends import adapt_prompt_for_platform, get_trends
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -161,17 +160,13 @@ class TestAdaptPromptForPlatform:
         assert result.aspect_ratio == "16:9"
         assert result.platform == Platform.LINKEDIN
 
-    def test_x_returns_horizontal_aspect_ratio(
-        self, slot_x: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_x_returns_horizontal_aspect_ratio(self, slot_x: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.X)
         result = adapt_prompt_for_platform(slot_x, brand, trends)
         assert result.aspect_ratio == "16:9"
         assert result.platform == Platform.X
 
-    def test_tiktok_prompt_includes_hook(
-        self, slot_tiktok: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_tiktok_prompt_includes_hook(self, slot_tiktok: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.TIKTOK)
         result = adapt_prompt_for_platform(slot_tiktok, brand, trends)
         prompt_lower = result.prompt.lower()
@@ -185,9 +180,7 @@ class TestAdaptPromptForPlatform:
         prompt_lower = result.prompt.lower()
         assert "narrative" in prompt_lower or "story" in prompt_lower or "intro" in prompt_lower
 
-    def test_prompt_contains_brand_context(
-        self, slot_tiktok: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_prompt_contains_brand_context(self, slot_tiktok: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.TIKTOK)
         result = adapt_prompt_for_platform(slot_tiktok, brand, trends)
         assert brand.name in result.brand_context
@@ -195,30 +188,31 @@ class TestAdaptPromptForPlatform:
         assert brand.target_audience in result.brand_context
         assert brand.industry in result.brand_context
 
-    def test_prompt_includes_slot_content(
-        self, slot_tiktok: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_prompt_includes_slot_content(self, slot_tiktok: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.TIKTOK)
         result = adapt_prompt_for_platform(slot_tiktok, brand, trends)
         assert slot_tiktok.image_prompt in result.prompt or slot_tiktok.caption in result.prompt
 
-    def test_slot_id_is_preserved(
-        self, slot_tiktok: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_slot_id_is_preserved(self, slot_tiktok: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.TIKTOK)
         result = adapt_prompt_for_platform(slot_tiktok, brand, trends)
         assert result.slot_id == slot_tiktok.slot_id
 
-    def test_audio_cue_is_set(
-        self, slot_tiktok: ContentSlot, brand: BrandKit
-    ) -> None:
+    def test_audio_cue_is_set(self, slot_tiktok: ContentSlot, brand: BrandKit) -> None:
         trends = get_trends(Platform.TIKTOK)
         result = adapt_prompt_for_platform(slot_tiktok, brand, trends)
         assert result.audio_cue is not None
         assert result.audio_cue in trends.trending_audio_cues
 
     def test_all_platforms_produce_valid_video_request(self, brand: BrandKit) -> None:
-        for platform in [Platform.TIKTOK, Platform.YOUTUBE, Platform.INSTAGRAM, Platform.LINKEDIN, Platform.X]:
+        all_platforms = [
+            Platform.TIKTOK,
+            Platform.YOUTUBE,
+            Platform.INSTAGRAM,
+            Platform.LINKEDIN,
+            Platform.X,
+        ]
+        for platform in all_platforms:
             slot = ContentSlot(
                 slot_id=f"slot-{platform.value}",
                 slot_number=1,

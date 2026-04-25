@@ -12,7 +12,6 @@ Also registered on Agentverse with Chat Protocol for ASI:One discoverability.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -158,7 +157,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
             results = await process_approved_slate(approved_slate, brand)
 
-            reply_text = f"[VIDEO_REPLY:{session_id}]\n{json.dumps([r.dict() for r in results], default=str)}"
+            results_json = json.dumps(
+                [r.dict() for r in results],
+                default=str,
+            )
+            reply_text = f"[VIDEO_REPLY:{session_id}]\n{results_json}"
             logger.info(
                 "Video Creator completed for user=%s brand=%s session=%s",
                 user_id,
@@ -198,7 +201,10 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text="I'm the AgentBuffer Video Creator. I generate platform-optimized videos via Google Veo when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
+                        text="I'm the AgentBuffer Video Creator. I generate "
+                        "platform-optimized videos via Google Veo when dispatched "
+                        "by the Marketing Director. Please chat with the main "
+                        "AgentBuffer agent instead.",
                     ),
                     EndSessionContent(type="end-session"),
                 ],
