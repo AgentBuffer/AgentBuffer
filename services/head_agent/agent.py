@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -488,10 +489,12 @@ async def _dispatch_image_generation(ctx: Context, session_id: str, recipient: s
         await _run_image_creator_inline(ctx, session_id, recipient, approved_slate, brand)
         return
 
-    image_payload = json.dumps({
-        "approved_slate": json.loads(approved_slate.json()),
-        "brand": json.loads(brand.json()),
-    })
+    image_payload = json.dumps(
+        {
+            "approved_slate": json.loads(approved_slate.json()),
+            "brand": json.loads(brand.json()),
+        }
+    )
     await ctx.send(
         IMAGE_CREATOR_ADDRESS,
         ChatMessage(
@@ -553,8 +556,8 @@ async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
     from services.shared.models import ImageResult
 
     prefix_end = text.index("]")
-    session_id = text[len("[IMAGE_REPLY:"):prefix_end]
-    payload_text = text[prefix_end + 1:].strip()
+    session_id = text[len("[IMAGE_REPLY:") : prefix_end]
+    payload_text = text[prefix_end + 1 :].strip()
 
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
@@ -767,6 +770,180 @@ async def _handle_regenerate_slate(ctx: Context, sender: str) -> None:
             ],
         ),
     )
+
+
+# ── Approval Flow ──
+
+
+async def _handle_approval_reply(
+    ctx: Context,
+    session_id: str,
+    sender: str,
+    text: str,
+) -> None:
+    """Parse the user's free-text approval reply and process decisions."""
+    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
+    queue_items = json.loads(queue_json) if queue_json else []
+
+    decisions = _parse_approval_text(session_id, text, queue_items)
+    if not decisions:
+        await _send_status(
+            ctx,
+            sender,
+            "I didn't understand your approval decision. "
+            "Please reply with:\n"
+            "  'approve all' — approve every slot\n"
+            "  'skip <slot_id>' — skip a specific slot\n"
+            "  'regenerate <slot_id>' — regenerate a specific slot",
+        )
+        return
+
+    await _process_approval_decisions(ctx, session_id, sender, decisions)
+
+
+def _parse_approval_text(
+    session_id: str,
+    text: str,
+    queue_items: list,
+) -> list[dict]:
+    """Parse free-text approval commands into decision dicts."""
+    normalized = text.strip().lower()
+    pending_ids = [item["slot_id"] for item in queue_items if item["status"] == "pending"]
+
+    if not pending_ids:
+        return []
+
+    if "approve all" in normalized:
+        return [
+            {
+                "session_id": session_id,
+                "slot_id": sid,
+                "action": "approve",
+            }
+            for sid in pending_ids
+        ]
+
+    decisions: list[dict] = []
+    parts = re.split(r"[,\n;]+", normalized)
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        for action in ("skip", "regenerate", "approve"):
+            if part.startswith(action + " "):
+                slot_ref = part[len(action) + 1 :].strip()
+                matched = _match_slot_id(slot_ref, pending_ids)
+                if matched:
+                    decisions.append(
+                        {
+                            "session_id": session_id,
+                            "slot_id": matched,
+                            "action": action,
+                        }
+                    )
+                break
+
+    return decisions
+
+
+def _match_slot_id(ref: str, slot_ids: list[str]) -> str | None:
+    """Match a slot reference to a slot ID (exact or partial)."""
+    ref = ref.strip()
+    if ref in slot_ids:
+        return ref
+    matches = [sid for sid in slot_ids if ref in sid]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+async def _process_approval_decisions(
+    ctx: Context,
+    session_id: str,
+    sender: str,
+    decisions: list[dict],
+) -> None:
+    """Apply approval decisions and dispatch regenerations."""
+    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
+    queue_items = json.loads(queue_json) if queue_json else []
+
+    regen_slots: list[str] = []
+    for decision in decisions:
+        for item in queue_items:
+            if item["slot_id"] == decision["slot_id"]:
+                if decision["action"] == "approve":
+                    item["status"] = "approved"
+                elif decision["action"] == "skip":
+                    item["status"] = "skipped"
+                elif decision["action"] == "regenerate":
+                    item["status"] = "regenerating"
+                    regen_slots.append(decision["slot_id"])
+                break
+
+    ctx.storage.set(
+        f"approval_queue:{session_id}",
+        json.dumps(queue_items),
+    )
+
+    if regen_slots:
+        await _send_status(
+            ctx,
+            sender,
+            f"Regenerating {len(regen_slots)} slot(s). "
+            "I'll send you an updated preview when ready.",
+        )
+        return
+
+    unresolved = [item for item in queue_items if item["status"] in ("pending", "regenerating")]
+    if not unresolved:
+        await _finalize_approved_slots(ctx, session_id, sender)
+    else:
+        remaining = [item for item in queue_items if item["status"] == "pending"]
+        if remaining:
+            await _send_status(
+                ctx,
+                sender,
+                f"{len(remaining)} slot(s) still pending approval. "
+                "Reply with decisions for the remaining slots.",
+            )
+
+
+async def _finalize_approved_slots(
+    ctx: Context,
+    session_id: str,
+    sender: str,
+) -> None:
+    """Publish approved slots and generate the final report."""
+    from services.shared.models import Slate
+
+    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
+    queue_items = json.loads(queue_json) if queue_json else []
+
+    approved_ids = {item["slot_id"] for item in queue_items if item["status"] == "approved"}
+
+    if not approved_ids:
+        await _send_status(
+            ctx,
+            sender,
+            "No slots were approved. Skipping publishing.",
+        )
+        _store(ctx, session_id, "stage", "report")
+        await _compile_final_report(ctx, session_id, sender)
+        return
+
+    slate_json = _load(ctx, session_id, "slate")
+    slate = Slate.parse_raw(slate_json)
+    approved_slots = [s for s in slate.slots if s.slot_id in approved_ids]
+
+    _store(ctx, session_id, "stage", "publish")
+
+    await _send_status(
+        ctx,
+        sender,
+        f"Publishing {len(approved_slots)} approved slot(s)…",
+    )
+
+    await _compile_final_report(ctx, session_id, sender)
 
 
 # ── Calendar & Manual Post Commands ──

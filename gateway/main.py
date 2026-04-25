@@ -55,15 +55,16 @@ app.include_router(assets.router)
 app.include_router(designs.router)
 app.include_router(dead_letters.router)
 
-USE_APPROVAL_QUEUE = (
-    os.environ.get("USE_APPROVAL_QUEUE", "true").lower() == "true"
-)
+USE_APPROVAL_QUEUE = os.environ.get("USE_APPROVAL_QUEUE", "true").lower() == "true"
 
 
 def _monday_of(dt: datetime) -> datetime:
     """Return midnight UTC of the Monday containing *dt*."""
     return (dt - timedelta(days=dt.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
 
@@ -76,7 +77,8 @@ async def health() -> dict:
 async def calendar(
     brand_id: str,
     week_start: str | None = Query(
-        default=None, description="YYYY-MM-DD",
+        default=None,
+        description="YYYY-MM-DD",
     ),
 ) -> dict:
     """Return all posts for a 7-day window.
@@ -86,7 +88,8 @@ async def calendar(
     """
     if week_start:
         start = datetime.strptime(
-            week_start, "%Y-%m-%d",
+            week_start,
+            "%Y-%m-%d",
         ).replace(tzinfo=timezone.utc)
     else:
         start = _monday_of(datetime.now(tz=timezone.utc))
