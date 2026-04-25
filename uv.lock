@@ -14,6 +14,7 @@ members = [
     "agentbuffer-critic",
     "agentbuffer-gateway",
     "agentbuffer-head-agent",
+    "agentbuffer-performance-harvester",
     "agentbuffer-publisher",
     "agentbuffer-shared",
     "agentbuffer-strategist",
@@ -28,35 +29,23 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "openai" },
     { name = "pydantic" },
+    { name = "ruff" },
     { name = "uagents" },
     { name = "uagents-core" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pillow" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "google-genai", specifier = ">=1.0" },
+    { name = "httpx" },
     { name = "openai" },
     { name = "pydantic" },
+    { name = "ruff", specifier = ">=0.4" },
     { name = "uagents", specifier = ">=0.20.0" },
     { name = "uagents-core" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pillow", specifier = ">=10.0" },
-    { name = "pytest", specifier = ">=9.0" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "ruff", specifier = ">=0.8" },
 ]
 
 [[package]]
@@ -138,6 +127,23 @@ requires-dist = [
     { name = "pydantic" },
     { name = "uagents", specifier = ">=0.20.0" },
     { name = "uagents-core" },
+]
+
+[[package]]
+name = "agentbuffer-performance-harvester"
+version = "0.1.0"
+source = { virtual = "services/performance_harvester" }
+dependencies = [
+    { name = "agentbuffer-shared" },
+    { name = "httpx" },
+    { name = "uagents" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentbuffer-shared", virtual = "services/shared" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "uagents", specifier = ">=0.14" },
 ]
 
 [[package]]

@@ -28,6 +28,7 @@ from uagents_core.contrib.protocols.chat import (
 
 from services.shared.models import (
     BrandKit,
+    BrandPerformanceSummary,
     ContentSlot,
     MarketingAnalysis,
     Platform,
@@ -65,6 +66,15 @@ Rules:
 Respond ONLY with the JSON array, no markdown fences or extra text.\
 """
 
+PERFORMANCE_ADDENDUM = """\
+
+Historical Performance Context (advisory — the BrandKit still takes precedence):
+- Prefer content types from the "top_formats" list when they align with the brand.
+- Schedule posts at times from "best_times" when possible.
+- Avoid content patterns listed in "avoid_patterns".
+Use this data to inform your choices, but do NOT override the brand voice or themes.\
+"""
+
 
 def _get_client() -> OpenAI:
     return OpenAI(base_url=ASI_ONE_BASE_URL, api_key=ASI_ONE_API_KEY)
@@ -79,9 +89,22 @@ def _clean_json_response(text: str) -> str:
     return text.strip()
 
 
-def generate_slate(brand: BrandKit, analysis: MarketingAnalysis) -> Slate:
-    """Generate a 7-day content slate using the LLM."""
+def generate_slate(
+    brand: BrandKit,
+    analysis: MarketingAnalysis,
+    performance_context: BrandPerformanceSummary | dict | None = None,
+) -> Slate:
+    """Generate a 7-day content slate using the LLM.
+
+    When *performance_context* is provided the Strategist will prefer
+    historically high-performing formats and times while still respecting
+    the BrandKit.
+    """
     client = _get_client()
+
+    system_prompt = SLATE_SYSTEM_PROMPT
+    if performance_context is not None:
+        system_prompt += PERFORMANCE_ADDENDUM
 
     context = (
         f"Brand: {brand.name}\n"
@@ -99,10 +122,18 @@ def generate_slate(brand: BrandKit, analysis: MarketingAnalysis) -> Slate:
         f"Cadence: {analysis.weekly_cadence}\n"
     )
 
+    if performance_context is not None:
+        perf_data = (
+            performance_context.model_dump()
+            if isinstance(performance_context, BrandPerformanceSummary)
+            else performance_context
+        )
+        context += f"\nPerformance Context:\n{json.dumps(perf_data, indent=2)}\n"
+
     resp = client.chat.completions.create(
         model=ASI_ONE_MODEL,
         messages=[
-            {"role": "system", "content": SLATE_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": context},
         ],
         max_tokens=4096,
@@ -184,7 +215,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             brand = BrandKit(**payload["brand"])
             analysis = MarketingAnalysis(**payload["analysis"])
-            slate = generate_slate(brand, analysis)
+            perf_ctx = payload.get("performance_context")
+            slate = generate_slate(brand, analysis, performance_context=perf_ctx)
 
             reply_text = f"[STRATEGIST_REPLY:{session_id}]\n{slate.json()}"
             await ctx.send(

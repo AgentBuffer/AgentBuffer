@@ -8,6 +8,8 @@ dependencies = [
     "openai",
     "pydantic",
     "google-genai>=1.0",
+    "httpx",
+    "ruff>=0.4",
 ]
 
 [dependency-groups]
