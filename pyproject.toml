@@ -9,6 +9,7 @@ dependencies = [
     "pydantic",
     "google-genai>=1.0",
     "httpx",
+    "ruff>=0.4",
 ]
 
 [tool.uv.workspace]
