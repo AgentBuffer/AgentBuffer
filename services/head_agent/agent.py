@@ -156,10 +156,27 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             await _handle_brandkit_updated(ctx, sender)
         return
 
+    # ── Calendar and manual post commands ──
+    normalized_cmd = text.strip().lower()
+    if normalized_cmd.startswith("show calendar"):
+        await _handle_show_calendar(ctx, sender, text)
+        return
+    if normalized_cmd.startswith("add post"):
+        await _handle_add_post(ctx, sender, text)
+        return
+
     # ── Regenerate slate command ──
     if text.strip().lower() == "regenerate slate":
         await _handle_regenerate_slate(ctx, sender)
         return
+
+    # Check if this is an approval reply from a user with an active session
+    existing_session_id = ctx.storage.get(f"sender_session:{sender}")
+    if existing_session_id:
+        stage = _load(ctx, existing_session_id, "stage")
+        if stage == "awaiting_approval":
+            await _handle_approval_reply(ctx, existing_session_id, sender, text)
+            return
 
     # Otherwise, this is a new user request
     session_id = str(uuid4())
@@ -749,6 +766,224 @@ async def _handle_regenerate_slate(ctx: Context, sender: str) -> None:
                 )
             ],
         ),
+    )
+
+
+# ── Calendar & Manual Post Commands ──
+
+
+async def _handle_show_calendar(
+    ctx: Context,
+    sender: str,
+    text: str,
+) -> None:
+    """Handle 'show calendar [week of YYYY-MM-DD]' command."""
+    from datetime import timedelta
+
+    from services.shared.models import Slate
+
+    # Parse optional week date
+    match = re.search(r"week of (\d{4}-\d{2}-\d{2})", text.strip().lower())
+    if match:
+        try:
+            target = datetime.strptime(match.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            await _send_status(
+                ctx, sender, "Invalid date format. Use: show calendar week of YYYY-MM-DD"
+            )
+            return
+    else:
+        target = datetime.now(tz=timezone.utc)
+
+    # Find Monday of that week
+    monday = target - timedelta(days=target.weekday())
+    monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Find the active session for this sender
+    session_id = ctx.storage.get(f"sender_session:{sender}")
+    if not session_id:
+        await _send_status(
+            ctx,
+            sender,
+            "No active session found. Please onboard a brand first to generate content.",
+        )
+        return
+
+    # Read from approval queue first, fall back to slate
+    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
+    slate_json = _load(ctx, session_id, "slate")
+
+    posts: list[dict] = []
+    if queue_json:
+        posts = json.loads(queue_json)
+    elif slate_json:
+        slate = Slate.parse_raw(slate_json)
+        for slot in slate.slots:
+            posts.append(
+                {
+                    "slot_id": slot.slot_id,
+                    "platform": slot.platform.value,
+                    "scheduled_time": slot.scheduled_for.isoformat(),
+                    "content_text": slot.caption,
+                    "status": slot.status,
+                }
+            )
+
+    # Filter to the requested week
+    week_posts: list[dict] = []
+    for p in posts:
+        try:
+            st = datetime.fromisoformat(p.get("scheduled_time", "").replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if monday <= st < monday + timedelta(days=7):
+            week_posts.append(p)
+
+    week_posts.sort(key=lambda x: x.get("scheduled_time", ""))
+
+    # Build plain-text digest
+    brand_json = _load(ctx, session_id, "brand")
+    brand_name = "Your brand"
+    if brand_json:
+        from services.shared.models import BrandKit
+
+        brand = BrandKit.parse_raw(brand_json)
+        brand_name = brand.name
+
+    lines = [
+        f"{brand_name} — week of {monday.strftime('%b %d')}",
+        "",
+    ]
+
+    current_day = ""
+    counts = {"approved": 0, "pending": 0, "skipped": 0}
+    for p in week_posts:
+        try:
+            st = datetime.fromisoformat(p["scheduled_time"].replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        day_label = st.strftime("%a %b %d")
+        if day_label != current_day:
+            current_day = day_label
+            lines.append(day_label)
+        time_str = st.strftime("%-I:%M %p")
+        platform = p.get("platform", "?").capitalize()
+        status = p.get("status", "pending")
+        status_label = f"[{status.capitalize()}]"
+        preview = p.get("content_text", "")[:60]
+        if len(p.get("content_text", "")) > 60:
+            preview += "..."
+        lines.append(f'  {time_str}  {platform:10s} {status_label:12s} "{preview}"')
+        counts[status] = counts.get(status, 0) + 1
+
+    lines.append("")
+    lines.append(
+        f"{counts.get('approved', 0)} posts approved · "
+        f"{counts.get('pending', 0)} pending review · "
+        f"{counts.get('skipped', 0)} skipped"
+    )
+    lines.append('Reply "approve all" to approve all pending posts.')
+
+    await _send_status(ctx, sender, "\n".join(lines))
+
+
+async def _handle_add_post(
+    ctx: Context,
+    sender: str,
+    text: str,
+) -> None:
+    """Handle 'add post [platform] [date YYYY-MM-DD] [time HH:MM] [content]' command."""
+    from datetime import timedelta
+
+    session_id = ctx.storage.get(f"sender_session:{sender}")
+    if not session_id:
+        await _send_status(
+            ctx,
+            sender,
+            "No active session found. Please onboard a brand first.",
+        )
+        return
+
+    # Parse command: add post <platform> <date> <time> <content>
+    parts = text.strip().split(None, 5)  # ['add', 'post', platform, date, time, content]
+    if len(parts) < 6:
+        await _send_status(
+            ctx,
+            sender,
+            "Usage: add post <platform> <YYYY-MM-DD> <HH:MM> <content text>\n"
+            "Platforms: instagram, twitter, linkedin, tiktok",
+        )
+        return
+
+    platform_raw = parts[2].lower()
+    date_str = parts[3]
+    time_str = parts[4]
+    content_text = parts[5]
+
+    # Validate platform
+    valid_platforms = {"instagram", "twitter", "linkedin", "tiktok"}
+    if platform_raw not in valid_platforms:
+        await _send_status(
+            ctx,
+            sender,
+            f"Invalid platform '{platform_raw}'. Choose from: instagram, twitter, linkedin, tiktok",
+        )
+        return
+
+    # Map twitter -> x for internal use
+    platform_internal = "x" if platform_raw == "twitter" else platform_raw
+
+    # Validate date
+    try:
+        post_date = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        await _send_status(
+            ctx,
+            sender,
+            "Invalid date/time format. Use: YYYY-MM-DD HH:MM (e.g. 2026-05-01 09:00)",
+        )
+        return
+
+    now = datetime.now(tz=timezone.utc)
+    if post_date < now:
+        await _send_status(ctx, sender, "Cannot schedule a post in the past.")
+        return
+    if post_date > now + timedelta(days=30):
+        await _send_status(
+            ctx,
+            sender,
+            "Cannot schedule more than 30 days in advance.",
+        )
+        return
+
+    # Create new slot in approval queue
+    new_slot_id = f"slot-manual-{uuid4().hex[:8]}"
+    new_item = {
+        "slot_id": new_slot_id,
+        "platform": platform_internal,
+        "scheduled_time": post_date.isoformat(),
+        "content_text": content_text,
+        "video_url": None,
+        "critic_score": 0.0,
+        "status": "approved",
+        "note": "manually added",
+    }
+
+    queue_json = ctx.storage.get(f"approval_queue:{session_id}")
+    queue_items = json.loads(queue_json) if queue_json else []
+    queue_items.append(new_item)
+    ctx.storage.set(f"approval_queue:{session_id}", json.dumps(queue_items))
+
+    await _send_status(
+        ctx,
+        sender,
+        f"Manual post added and auto-approved:\n"
+        f"  Platform: {platform_raw}\n"
+        f"  Scheduled: {post_date.strftime('%a %b %d at %-I:%M %p')} UTC\n"
+        f"  Content: {content_text[:120]}\n\n"
+        "Note: Manual posts bypass the Critic by default.",
     )
 
 

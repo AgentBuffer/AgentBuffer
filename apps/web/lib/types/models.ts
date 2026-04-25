@@ -2,6 +2,7 @@ export enum Platform {
   LINKEDIN = "linkedin",
   X = "x",
   INSTAGRAM = "instagram",
+  TIKTOK = "tiktok",
 }
 
 export interface BrandKit {
@@ -25,16 +26,21 @@ export interface ContentSlot {
   platform: Platform;
   scheduled_for: string;
   image_url: string | null;
+  video_url?: string | null;
   status:
     | "draft"
     | "proposed"
     | "rejected"
     | "approved"
     | "published"
-    | "failed";
+    | "failed"
+    | "pending"
+    | "skipped";
   critic_scores?: CriticScore[];
   critic_average?: number;
   critic_summary?: string;
+  note?: string;
+  engagement?: EngagementMetrics;
 }
 
 export interface Slate {
@@ -82,4 +88,18 @@ export interface RankedSlot {
   slot_id: string;
   rank: number;
   reasoning: string;
+}
+
+export interface EngagementMetrics {
+  likes: number;
+  shares: number;
+  comments: number;
+  reach: number;
+  engagement_rate: number;
+}
+
+export interface CalendarResponse {
+  brand_id: string;
+  week_start: string;
+  posts: ContentSlot[];
 }

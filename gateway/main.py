@@ -10,7 +10,10 @@ Run:
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import os
+from datetime import datetime, timedelta, timezone
+
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway.routes import (
@@ -52,7 +55,44 @@ app.include_router(assets.router)
 app.include_router(designs.router)
 app.include_router(dead_letters.router)
 
+USE_APPROVAL_QUEUE = (
+    os.environ.get("USE_APPROVAL_QUEUE", "true").lower() == "true"
+)
+
+
+def _monday_of(dt: datetime) -> datetime:
+    """Return midnight UTC of the Monday containing *dt*."""
+    return (dt - timedelta(days=dt.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
 
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "gateway", "version": "0.1.0"}
+
+
+@app.get("/brands/{brand_id}/calendar")
+async def calendar(
+    brand_id: str,
+    week_start: str | None = Query(
+        default=None, description="YYYY-MM-DD",
+    ),
+) -> dict:
+    """Return all posts for a 7-day window.
+
+    Currently returns an empty stub — real implementation will read
+    from Supabase once the gateway is wired to the agent storage layer.
+    """
+    if week_start:
+        start = datetime.strptime(
+            week_start, "%Y-%m-%d",
+        ).replace(tzinfo=timezone.utc)
+    else:
+        start = _monday_of(datetime.now(tz=timezone.utc))
+
+    return {
+        "brand_id": brand_id,
+        "week_start": start.strftime("%Y-%m-%d"),
+        "posts": [],
+    }

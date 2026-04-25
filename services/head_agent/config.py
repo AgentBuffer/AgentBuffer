@@ -16,3 +16,5 @@ CRITIC_ADDRESS = os.environ.get("CRITIC_ADDRESS", "")
 VIDEO_CREATOR_ADDRESS = os.environ.get("VIDEO_CREATOR_ADDRESS", "")
 IMAGE_CREATOR_ADDRESS = os.environ.get("IMAGE_CREATOR_ADDRESS", "")
 PUBLISHER_ADDRESS = os.environ.get("PUBLISHER_ADDRESS", "")
+
+USE_APPROVAL_QUEUE = os.environ.get("USE_APPROVAL_QUEUE", "true").lower() == "true"
