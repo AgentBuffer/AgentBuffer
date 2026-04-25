@@ -116,7 +116,6 @@ def _upload_to_storage(local_path: str) -> str:
         return local_path
 
 
-
 # ── Agentverse agent setup ──
 
 agent = Agent(

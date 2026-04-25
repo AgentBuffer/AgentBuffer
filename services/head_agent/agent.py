@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -471,8 +472,8 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     """Handle the Strategist sub-agent's reply with the generated Slate."""
     # Parse session_id from prefix
     prefix_end = text.index("]")
-    session_id = text[len("[STRATEGIST_REPLY:"):prefix_end]
-    payload_text = text[prefix_end + 1:].strip()
+    session_id = text[len("[STRATEGIST_REPLY:") : prefix_end]
+    payload_text = text[prefix_end + 1 :].strip()
 
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
@@ -482,6 +483,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     try:
         slate_data = json.loads(payload_text)
         from services.shared.models import Slate
+
         slate = Slate(**slate_data)
     except Exception as exc:
         logger.error("Failed to parse strategist reply: %s", exc)
@@ -492,8 +494,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     _store(ctx, session_id, "stage", "critique")
 
     slot_summary = "\n".join(
-        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..."
-        for s in slate.slots
+        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..." for s in slate.slots
     )
     await _send_status(
         ctx,
@@ -505,11 +506,13 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
 
     # Dispatch to Critic
     brand_json = _load(ctx, session_id, "brand")
-    critic_payload = json.dumps({
-        "session_id": session_id,
-        "slate": json.loads(slate.json()),
-        "brand": json.loads(brand_json) if brand_json else {},
-    })
+    critic_payload = json.dumps(
+        {
+            "session_id": session_id,
+            "slate": json.loads(slate.json()),
+            "brand": json.loads(brand_json) if brand_json else {},
+        }
+    )
 
     if not CRITIC_ADDRESS:
         await _run_critic_inline(ctx, session_id, user_sender, slate)
@@ -520,10 +523,14 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")],
+            content=[
+                TextContent(
+                    type="text",
+                    text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}",
+                )
+            ],
         ),
     )
-
 
 
 async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
@@ -621,6 +628,15 @@ async def _enter_approval_gate(
 
     digest = _format_approval_digest(queue_items, verdicts)
     await _send_status(ctx, sender, digest)
+
+
+def _remove_from_active_approvals(ctx: Context, session_id: str) -> None:
+    """Remove a session from the active approval sessions list."""
+    active_json = ctx.storage.get("active_approval_sessions")
+    active_sessions = json.loads(active_json) if active_json else []
+    if session_id in active_sessions:
+        active_sessions.remove(session_id)
+    ctx.storage.set("active_approval_sessions", json.dumps(active_sessions))
 
 
 def _format_approval_digest(queue_items: list, verdicts: list) -> str:
@@ -1298,16 +1314,23 @@ async def _dispatch_image_generation(ctx: Context, session_id: str, recipient: s
         await _run_image_creator_inline(ctx, session_id, recipient, approved_slate, brand)
         return
 
-    image_payload = json.dumps({
-        "approved_slate": json.loads(approved_slate.json()),
-        "brand": json.loads(brand.json()),
-    })
+    image_payload = json.dumps(
+        {
+            "approved_slate": json.loads(approved_slate.json()),
+            "brand": json.loads(brand.json()),
+        }
+    )
     await ctx.send(
         IMAGE_CREATOR_ADDRESS,
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[IMAGE_REQUEST:{session_id}]\n{image_payload}")],
+            content=[
+                TextContent(
+                    type="text",
+                    text=f"[IMAGE_REQUEST:{session_id}]\n{image_payload}",
+                )
+            ],
         ),
     )
 
@@ -1358,8 +1381,8 @@ async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
     from services.shared.models import ImageResult
 
     prefix_end = text.index("]")
-    session_id = text[len("[IMAGE_REPLY:"):prefix_end]
-    payload_text = text[prefix_end + 1:].strip()
+    session_id = text[len("[IMAGE_REPLY:") : prefix_end]
+    payload_text = text[prefix_end + 1 :].strip()
 
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
@@ -1378,7 +1401,8 @@ async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
             await _send_status(
                 ctx,
                 user_sender,
-                f"Image generation complete: {success_count}/{len(results)} images created successfully.",
+                f"Image generation complete: {success_count}/{len(results)} "
+                "images created successfully.",
             )
     except Exception as exc:
         logger.error("Failed to parse image reply: %s", exc)

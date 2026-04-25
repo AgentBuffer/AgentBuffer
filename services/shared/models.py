@@ -160,7 +160,6 @@ class BrandPerformanceSummary(BaseModel):
     avoid_patterns: list[str]
 
 
-
 class TrendContext(BaseModel):
     platform: Platform
     trending_topics: list[str]
