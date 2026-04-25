@@ -61,24 +61,24 @@ AgentBuffer is a multi-agent marketing automation platform built on [Fetch.ai's 
         ┌────────┘   ┌────┘   ┌────┘   ┌────┘   ┌───┘
         ▼            ▼        ▼        ▼        ▼
  ┌────────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
- │ STRATEGIST │ │ CRITIC │ │  VIDEO   │ │ CAROUSEL │ │PUBLISHER │
+ │ STRATEGIST │ │ CRITIC │ │  IMAGE   │ │  VIDEO   │ │PUBLISHER │
  │            │ │        │ │ CREATOR  │ │ CREATOR  │ │          │
- │ 7-day     │ │ 5-axis │ │ Google   │ │ Pillow   │ │ Ayrshare │
- │ content   │ │ rubric │ │ Veo API  │ │ renderer │ │ multi-   │
- │ slates    │ │ rejects│ │ per-plat │ │ 1080x1350│ │ platform │
- │ via LLM   │ │ weak   │ │ trends   │ │ slides   │ │ posts    │
+ │ 7-day     │ │ 5-axis │ │ Google   │ │ Google   │ │ Ayrshare │
+ │ content   │ │ rubric │ │ Imagen   │ │ Veo API  │ │ multi-   │
+ │ slates    │ │ rejects│ │ API      │ │ per-plat │ │ platform │
+ │ via LLM   │ │ weak   │ │          │ │ trends   │ │ posts    │
  └────────────┘ └────────┘ └──────────┘ └──────────┘ └──────────┘
-                                │
-                      ┌─────────┘
-                      ▼
-            ┌───────────────────┐     ┌──────────────────────┐
-            │  DESIGN DIRECTOR  │     │ PERFORMANCE          │
-            │                   │     │ HARVESTER            │
-            │  Interprets       │     │                      │
-            │  design requests  │     │ Daily Ayrshare       │
-            │  & delegates to   │     │ analytics → feedback │
-            │  specialists      │     │ loop to Strategist   │
-            └────────┬──────────┘     └──────────────────────┘
+                                │              │
+                      ┌─────────┘              │
+                      ▼                        ▼
+            ┌───────────────────┐  ┌──────────┐  ┌──────────────────────┐
+            │  DESIGN DIRECTOR  │  │ CAROUSEL │  │ PERFORMANCE          │
+            │                   │  │ CREATOR  │  │ HARVESTER            │
+            │  Interprets       │  │          │  │                      │
+            │  design requests  │  │ Pillow   │  │ Daily Ayrshare       │
+            │  & delegates to   │  │ renderer │  │ analytics → feedback │
+            │  specialists      │  │ 1080x1350│  │ loop to Strategist   │
+            └────────┬──────────┘  └──────────┘  └──────────────────────┘
                      │
                      ▼
             ┌─────────────────┐
@@ -101,6 +101,7 @@ All agents are registered on [Agentverse](https://agentverse.ai) with the mandat
 | **Marketing Director** (Head Agent) | Orchestrator — parses brands, generates analysis, dispatches sub-agents, manages approval gate, compiles reports | `services/head_agent/` | 8001 |
 | **Strategist** | Generates 7-day content slates with platform-optimized captions and image/video prompts | `services/strategist/` | 8002 |
 | **Critic** | 5-axis quality scoring; must reject at least 1 slot per slate | `services/critic/` | 8003 |
+| **Image Creator** | Platform-specific image generation via Google Imagen API | `services/image_creator/` | 8006 |
 | **Video Creator** | Platform-specific video generation via Google Veo with trend adaptation | `services/video_creator/` | 8004 |
 | **Publisher** | Multi-platform publishing and scheduling via Ayrshare API | `services/publisher/` | 8005 |
 | **Performance Harvester** | Daily scheduled agent that fetches Ayrshare analytics and builds performance summaries | `services/performance_harvester/` | 8006 |
@@ -141,7 +142,7 @@ flowchart TD
 | **2. Analysis** | Generate competitive marketing analysis | LLM produces `MarketingAnalysis` with positioning, differentiators, platform recommendations |
 | **3. Strategize** | Create a weekly content plan | LLM generates a 7-slot `Slate` with captions and image prompts across recommended platforms |
 | **4. Critique** | Quality gate — 5-axis scoring rubric | Each slot scored on Brand Voice, Visual Coherence, Platform Fit, Audience Relevance, Originality. At least 1 slot must be rejected |
-| **5. Create** | Generate media assets | Video Creator (Veo), Carousel Creator (Pillow), or Design Director routes based on content type |
+| **5. Create** | Generate media assets | Image Creator (Imagen), Video Creator (Veo), Carousel Creator (Pillow), or Design Director routes based on content type |
 | **6. Approval** | Human-in-the-loop review | Content preview queue; users can approve, skip, or request regeneration per slot |
 | **7. Publish** | Cross-platform distribution | Ayrshare API schedules posts with idempotency keys and dead-letter handling |
 | **8. Report** | Final campaign summary | Compiled report sent back to user via ASI:One chat |
@@ -391,6 +392,11 @@ AgentBuffer/
 │   │   └── agent.py              # 7-day slate generation via LLM
 │   ├── critic/                   # Quality control agent
 │   │   └── agent.py              # 5-axis scoring rubric, mandatory rejection
+│   ├── image_creator/            # Image generation agent
+│   │   ├── agent.py              # Sub-agent entry, receives ApprovedSlate
+│   │   ├── imagen_client.py      # Google Imagen SDK wrapper
+│   │   ├── prompt_adapter.py     # Platform-specific prompt adaptation
+│   │   └── config.py             # Imagen settings (model, retries, output dir)
 │   ├── video_creator/            # Video generation agent
 │   │   ├── agent.py              # Sub-agent entry, receives ApprovedSlate
 │   │   ├── veo_client.py         # Google Veo SDK wrapper (submit, poll, download)
@@ -425,11 +431,12 @@ AgentBuffer/
 │       ├── models.py             # CampaignRequest/Response schemas
 │       └── auth.py               # API key middleware
 ├── apps/web/                     # Next.js 16 dashboard (React 19, Tailwind, Supabase auth)
-├── gateway/                      # FastAPI gateway (placeholder)
+├── gateway/                      # FastAPI gateway
 ├── supabase/migrations/          # PostgreSQL schema (organizations, brands, content_slots, etc.)
 ├── docs/                         # Design documents
 │   ├── veo_pipeline.md
 │   ├── carousel_pipeline.md
+│   ├── imagen_pipeline.md
 │   ├── design_agent_architecture.md
 │   └── mcp_integration.md
 ├── pyproject.toml                # Root config (uv workspace)
@@ -444,6 +451,7 @@ AgentBuffer/
 |---|---|
 | **Agent Framework** | [Fetch.ai uAgents](https://fetch.ai/docs) + Agentverse Chat Protocol |
 | **LLM** | [ASI:One](https://asi1.ai) (OpenAI-compatible API) |
+| **Image Generation** | [Google Imagen](https://deepmind.google/technologies/imagen/) via `google-genai` SDK |
 | **Video Generation** | [Google Veo](https://deepmind.google/technologies/veo/) via `google-genai` SDK |
 | **Image Rendering** | [Pillow](https://pillow.readthedocs.io/) (carousel slides + marketing assets) |
 | **Publishing** | [Ayrshare](https://www.ayrshare.com/) (LinkedIn, X, Instagram, TikTok, YouTube) |
@@ -574,6 +582,37 @@ The [GitHub Actions CI](.github/workflows/ci.yml) runs on every push/PR to `main
 
 ---
 
+## Environment Variables
+
+```bash
+# Core
+ASI_ONE_API_KEY=...                          # ASI:One LLM API key
+GOOGLE_API_KEY=...                           # Google GenAI (Imagen + Veo)
+AYRSHARE_API_KEY=...                         # Ayrshare publishing API
+
+# Image Creator
+IMAGEN_MODEL=imagen-4.0-generate-preview     # Imagen model version
+IMAGEN_MAX_RETRIES=3                         # Max retry attempts
+IMAGEN_RETRY_DELAY=5                         # Delay between retries (seconds)
+IMAGE_OUTPUT_DIR=output/images               # Local output directory
+IMAGE_CREATOR_SEED=agentbuffer-image-creator-seed-v1
+IMAGE_CREATOR_PORT=8006
+IMAGE_CREATOR_ADDRESS=                       # Agentverse address, or empty for inline mode
+
+# Video Creator
+VEO_MODEL=veo-3.0-generate-preview
+VIDEO_OUTPUT_DIR=output/videos
+VIDEO_CREATOR_SEED=agentbuffer-video-creator-seed-v1
+VIDEO_CREATOR_PORT=8004
+VIDEO_CREATOR_ADDRESS=
+
+# Agent Ports
+HEAD_AGENT_PORT=8001
+PUBLISHER_PORT=8005
+```
+
+---
+
 ## Hackathon: Fetch.ai Agentverse Prize
 
 This project demonstrates:
@@ -582,7 +621,7 @@ This project demonstrates:
 - **Discoverable and usable through ASI:One** — no custom frontend required
 - **Real-world problem**: automated marketing content pipeline for businesses
 - **Quality enforcement**: Critic agent with mandatory rejection and 5-axis scoring
-- **Platform-native content**: trend-adapted video and carousel generation per platform
+- **Platform-native content**: trend-adapted image, video, and carousel generation per platform
 
 ---
 

@@ -8,7 +8,9 @@ interface BadgeProps {
     | "rejected"
     | "approved"
     | "published"
-    | "failed";
+    | "failed"
+    | "pending"
+    | "skipped";
   className?: string;
   children: React.ReactNode;
 }
@@ -26,6 +28,8 @@ export function Badge({ variant = "default", className, children }: BadgeProps) 
           "bg-green-50 text-lime-600": variant === "approved",
           "bg-violet-50 text-violet-600": variant === "published",
           "bg-orange-50 text-orange-500": variant === "failed",
+          "bg-amber-50 text-amber-600": variant === "pending",
+          "bg-slate-100 text-slate-400 line-through": variant === "skipped",
         },
         className
       )}
