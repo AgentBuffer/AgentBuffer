@@ -37,6 +37,7 @@ from services.head_agent.config import (
     CRITIC_ADDRESS,
     HEAD_AGENT_PORT,
     HEAD_AGENT_SEED,
+    IMAGE_CREATOR_ADDRESS,
     STRATEGIST_ADDRESS,
 )
 
@@ -135,6 +136,9 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         return
     if text.startswith("[CRITIC_REPLY:"):
         await _handle_critic_reply(ctx, sender, text)
+        return
+    if text.startswith("[IMAGE_REPLY:"):
+        await _handle_image_reply(ctx, sender, text)
         return
 
     # Otherwise, this is a new user request
@@ -294,8 +298,8 @@ async def _run_critic_inline(ctx, session_id, sender, slate):
 
     await _send_status(ctx, sender, critic_summary)
 
-    # Compile final report
-    await _compile_final_report(ctx, session_id, sender)
+    # Dispatch to Image Creator before final report
+    await _dispatch_image_generation(ctx, session_id, sender)
 
 
 async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None:
@@ -391,6 +395,124 @@ async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
         critic_summary += f"  Slot {v.slot_id}: [{status}] avg={v.average:.1f}/5.0 — {v.summary}\n"
 
     await _send_status(ctx, user_sender, critic_summary)
+    await _dispatch_image_generation(ctx, session_id, user_sender)
+
+
+async def _dispatch_image_generation(ctx: Context, session_id: str, recipient: str) -> None:
+    """Dispatch image generation after critic approval, before publishing."""
+    from services.shared.models import ApprovedSlate, BrandKit, CriticVerdict, Slate
+
+    slate_json = _load(ctx, session_id, "slate")
+    brand_json = _load(ctx, session_id, "brand")
+    verdicts_json = _load(ctx, session_id, "verdicts")
+
+    if not slate_json or not brand_json or not verdicts_json:
+        await _compile_final_report(ctx, session_id, recipient)
+        return
+
+    slate = Slate.parse_raw(slate_json)
+    brand = BrandKit.parse_raw(brand_json)
+    verdicts = [CriticVerdict(**v) for v in json.loads(verdicts_json)]
+    approved_slate = ApprovedSlate(slate=slate, verdicts=verdicts)
+
+    approved_count = sum(1 for v in verdicts if v.approved)
+    if approved_count == 0:
+        await _compile_final_report(ctx, session_id, recipient)
+        return
+
+    await _send_status(ctx, recipient, "Generating AI images for your content...")
+    _store(ctx, session_id, "stage", "image_generation")
+
+    if not IMAGE_CREATOR_ADDRESS:
+        await _run_image_creator_inline(ctx, session_id, recipient, approved_slate, brand)
+        return
+
+    image_payload = json.dumps({
+        "approved_slate": json.loads(approved_slate.json()),
+        "brand": json.loads(brand.json()),
+    })
+    await ctx.send(
+        IMAGE_CREATOR_ADDRESS,
+        ChatMessage(
+            timestamp=datetime.now(tz=timezone.utc),
+            msg_id=uuid4(),
+            content=[TextContent(type="text", text=f"[IMAGE_REQUEST:{session_id}]\n{image_payload}")],
+        ),
+    )
+
+
+async def _run_image_creator_inline(ctx, session_id, sender, approved_slate, brand):
+    """Run the image creator logic inline when no external agent is configured."""
+    from services.image_creator.agent import process_approved_slate
+
+    try:
+        results = await process_approved_slate(approved_slate, brand)
+    except Exception as exc:
+        logger.error("Inline image creator failed: %s", exc)
+        await _send_status(ctx, sender, f"Image generation encountered an error: {exc}")
+        await _compile_final_report(ctx, session_id, sender)
+        return
+
+    _apply_image_results(ctx, session_id, results)
+    success_count = sum(1 for r in results if r.status == "success")
+    await _send_status(
+        ctx,
+        sender,
+        f"Image generation complete: {success_count}/{len(results)} images created successfully.",
+    )
+    await _compile_final_report(ctx, session_id, sender)
+
+
+def _apply_image_results(ctx: Context, session_id: str, results: list) -> None:
+    """Update stored slate with generated image URLs/paths."""
+    from services.shared.models import Slate
+
+    slate_json = _load(ctx, session_id, "slate")
+    if not slate_json:
+        return
+
+    slate = Slate.parse_raw(slate_json)
+    result_map = {r.slot_id: r for r in results if r.status == "success"}
+
+    for slot in slate.slots:
+        if slot.slot_id in result_map:
+            result = result_map[slot.slot_id]
+            slot.image_url = result.image_url or result.local_path
+
+    _store(ctx, session_id, "slate", slate.json())
+
+
+async def _handle_image_reply(ctx: Context, sender: str, text: str) -> None:
+    """Handle the Image Creator sub-agent's reply with generated images."""
+    from services.shared.models import ImageResult
+
+    prefix_end = text.index("]")
+    session_id = text[len("[IMAGE_REPLY:"):prefix_end]
+    payload_text = text[prefix_end + 1:].strip()
+
+    user_sender = _load(ctx, session_id, "sender")
+    if not user_sender:
+        logger.error("No sender found for session %s", session_id)
+        return
+
+    try:
+        results_data = json.loads(payload_text)
+        if isinstance(results_data, dict) and "error" in results_data:
+            logger.error("Image Creator returned error: %s", results_data["error"])
+            await _send_status(ctx, user_sender, f"Image generation error: {results_data['error']}")
+        else:
+            results = [ImageResult(**r) for r in results_data]
+            _apply_image_results(ctx, session_id, results)
+            success_count = sum(1 for r in results if r.status == "success")
+            await _send_status(
+                ctx,
+                user_sender,
+                f"Image generation complete: {success_count}/{len(results)} images created successfully.",
+            )
+    except Exception as exc:
+        logger.error("Failed to parse image reply: %s", exc)
+        await _send_status(ctx, user_sender, f"Image generation returned invalid data: {exc}")
+
     await _compile_final_report(ctx, session_id, user_sender)
 
 

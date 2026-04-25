@@ -106,7 +106,6 @@ class AgentEnvelope(BaseModel):
     timestamp: datetime
 
 
-
 class TrendContext(BaseModel):
     platform: Platform
     trending_topics: list[str]
@@ -132,6 +131,25 @@ class VideoResult(BaseModel):
     platform: Platform
     duration_seconds: int | None = None
     status: str
+    error: str | None = None
+
+
+class ImageRequest(BaseModel):
+    slot_id: str
+    prompt: str
+    aspect_ratio: str
+    platform: Platform
+    style: str | None = None
+    brand_context: str
+    negative_prompt: str = ""
+
+
+class ImageResult(BaseModel):
+    slot_id: str
+    image_url: str | None = None
+    local_path: str | None = None
+    platform: Platform
+    status: str  # "success", "error"
     error: str | None = None
 
 
