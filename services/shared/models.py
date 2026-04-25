@@ -14,6 +14,7 @@ class Platform(str, Enum):
     INSTAGRAM = "instagram"
     TIKTOK = "tiktok"
     YOUTUBE = "youtube"
+    BLUESKY = "bluesky"
 
 
 class BrandKit(BaseModel):

@@ -1,7 +1,10 @@
-"""Publisher uAgent — publishes approved content to social platforms via Ayrshare.
+"""Publisher uAgent — publishes approved content to social platforms.
 
 Receives approved ContentSlots + optional VideoResults from the Head Agent
 and schedules posts for publication.
+
+Uses per-platform adapters (services.publisher.adapters) to call each
+social network's native API directly — no third-party aggregator required.
 
 Can operate as:
   1. A standalone Agentverse agent (via Chat Protocol)
@@ -10,6 +13,7 @@ Can operate as:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -25,9 +29,9 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
+from services.publisher.adapters.base import get_adapter
 from services.shared.models import (
     ContentSlot,
-    Platform,
     PublishResult,
 )
 
@@ -35,39 +39,28 @@ logger = logging.getLogger(__name__)
 
 PUBLISHER_SEED = os.environ.get("PUBLISHER_SEED", "agentbuffer-publisher-seed-v1")
 PUBLISHER_PORT = int(os.environ.get("PUBLISHER_PORT", "8005"))
-AYRSHARE_API_KEY = os.environ.get("AYRSHARE_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "agent-media")
 
 
+async def _publish_slot(slot: ContentSlot, idempotency_key: str) -> PublishResult:
+    """Publish a single slot via the platform-specific adapter."""
+    adapter = get_adapter(slot.platform)
+    return await adapter.publish(slot, idempotency_key)
+
+
 def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
     """Publish content slots to their target platforms.
 
-    Currently returns simulated results. Replace with Ayrshare API calls
-    when the API key is configured.
+    Delegates to the appropriate platform adapter for each slot.
+    Falls back to simulated results when no credentials are configured
+    (each adapter handles this internally).
     """
     results = []
     for slot in slots:
         idempotency_key = f"pub-{slot.slot_id}-{uuid4().hex[:6]}"
-
-        if AYRSHARE_API_KEY:
-            result = _publish_via_ayrshare(slot, idempotency_key)
-        else:
-            result = PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=f"https://{slot.platform.value}.com/simulated/{slot.slot_id}",
-                error=None,
-                idempotency_key=idempotency_key,
-            )
-            logger.info(
-                "Simulated publish for slot %s to %s (no AYRSHARE_API_KEY)",
-                slot.slot_id,
-                slot.platform.value,
-            )
-
+        result = asyncio.get_event_loop().run_until_complete(_publish_slot(slot, idempotency_key))
         results.append(result)
 
     return results
@@ -122,69 +115,6 @@ def _upload_to_storage(local_path: str) -> str:
         logger.warning("Failed to upload to Supabase Storage: %s — using local path", exc)
         return local_path
 
-
-def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishResult:
-    """Publish a single slot via the Ayrshare API."""
-    try:
-        import requests
-
-        platform_map = {
-            Platform.LINKEDIN: "linkedin",
-            Platform.X: "twitter",
-            Platform.INSTAGRAM: "instagram",
-            Platform.TIKTOK: "tiktok",
-            Platform.YOUTUBE: "youtube",
-        }
-
-        payload = {
-            "post": slot.caption,
-            "platforms": [platform_map.get(slot.platform, "instagram")],
-            "scheduledDate": slot.scheduled_for.isoformat(),
-        }
-
-        if slot.image_url:
-            media_url = slot.image_url
-            if not media_url.startswith("http"):
-                media_url = _upload_to_storage(media_url)
-            if media_url.startswith("http"):
-                payload["mediaUrls"] = [media_url]
-
-        resp = requests.post(
-            "https://app.ayrshare.com/api/post",
-            headers={
-                "Authorization": f"Bearer {AYRSHARE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-
-        if resp.status_code == 200:
-            data = resp.json()
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=data.get("postUrl", ""),
-                error=None,
-                idempotency_key=idempotency_key,
-            )
-        else:
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=False,
-                error=f"Ayrshare API error: {resp.status_code} — {resp.text}",
-                idempotency_key=idempotency_key,
-            )
-    except Exception as exc:
-        return PublishResult(
-            slot_id=slot.slot_id,
-            platform=slot.platform,
-            success=False,
-            error=str(exc),
-            idempotency_key=idempotency_key,
-        )
 
 
 # ── Agentverse agent setup ──
