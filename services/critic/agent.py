@@ -41,6 +41,8 @@ ASI_ONE_MODEL = os.environ.get("ASI_ONE_MODEL", "asi1")
 CRITIC_SEED = os.environ.get("CRITIC_SEED", "agentbuffer-critic-seed-v1")
 CRITIC_PORT = int(os.environ.get("CRITIC_PORT", "8003"))
 
+USE_RULE_COMPLIANCE_IN_THRESHOLD = False
+
 CRITIC_SYSTEM_PROMPT = """\
 You are a ruthless content quality critic for a marketing agency. You evaluate social media \
 content on 5 axes, each scored 0.0 to 5.0.
@@ -90,6 +92,50 @@ def _clean_json_response(text: str) -> str:
     return text.strip()
 
 
+def _score_rule_compliance(
+    caption: str,
+    content_rules: dict,
+) -> CriticScore:
+    """Deterministic 6th-axis scoring for content rule compliance.
+
+    * Score 10 if all relevant ``always_do`` rules are reflected.
+    * Deduct 2 per ``never_do`` violation found.
+    * Floor at 0.
+    * If ``content_rules`` is empty, score 10 with a note.
+    """
+    always_do: list[str] = content_rules.get("always_do", [])
+    never_do: list[str] = content_rules.get("never_do", [])
+
+    if not always_do and not never_do:
+        return CriticScore(
+            axis="Rule Compliance",
+            score=10.0,
+            reasoning="No content rules defined — default full score.",
+        )
+
+    caption_lower = caption.lower()
+    score = 10.0
+    passed: list[str] = []
+    failed: list[str] = []
+
+    for rule in always_do:
+        if rule.lower() in caption_lower:
+            passed.append(f"always_do: '{rule}' — present")
+        # If the rule isn't literally present we don't deduct (it may not
+        # apply to this content type), but we note it.
+
+    for rule in never_do:
+        if rule.lower() in caption_lower:
+            score = max(score - 2, 0)
+            failed.append(f"never_do: '{rule}' — VIOLATED")
+        else:
+            passed.append(f"never_do: '{rule}' — OK")
+
+    parts = passed + failed
+    reasoning = "; ".join(parts) if parts else "Rules evaluated."
+    return CriticScore(axis="Rule Compliance", score=score, reasoning=reasoning)
+
+
 def critique_slate(slate: Slate, brand: BrandKit) -> list[CriticVerdict]:
     """Score each slot in the slate and return verdicts."""
     client = _get_client()
@@ -106,12 +152,19 @@ def critique_slate(slate: Slate, brand: BrandKit) -> list[CriticVerdict]:
             }
         )
 
+    # Extract content_rules from the BrandKit for rule compliance scoring
+    content_rules = {
+        "always_do": brand.content_rules.always_do,
+        "never_do": brand.content_rules.never_do,
+    }
+
     context = (
         f"Brand: {brand.name}\n"
         f"Industry: {brand.industry}\n"
         f"Voice: {brand.voice_description}\n"
         f"Target Audience: {brand.target_audience}\n"
         f"Tagline: {brand.tagline}\n\n"
+        f"Content Rules:\n{json.dumps(content_rules, indent=2)}\n\n"
         f"Content Slots to Review:\n{json.dumps(slots_description, indent=2)}"
     )
 
@@ -127,18 +180,37 @@ def critique_slate(slate: Slate, brand: BrandKit) -> list[CriticVerdict]:
     raw = resp.choices[0].message.content or "[]"
     verdicts_data = json.loads(_clean_json_response(raw))
 
+    # Build a map of slot_id -> caption for rule-compliance scoring
+    caption_map = {s.slot_id: s.caption for s in slate.slots}
+
     verdicts = []
     for v_data in verdicts_data:
         scores = [CriticScore(**s) for s in v_data.get("scores", [])]
+
+        # Add the 6th axis: Rule Compliance (scored deterministically)
+        slot_id = v_data["slot_id"]
+        caption = caption_map.get(slot_id, "")
+        rule_score = _score_rule_compliance(caption, content_rules)
+        scores.append(rule_score)
+
+        # Original 5-axis average (unchanged pass/fail threshold)
+        original_scores = [s for s in scores if s.axis != "Rule Compliance"]
         avg = v_data.get("average", 0.0)
-        if scores and not avg:
-            avg = sum(s.score for s in scores) / len(scores)
+        if original_scores and not avg:
+            avg = sum(s.score for s in original_scores) / len(original_scores)
+
+        approved = v_data.get("approved", avg >= 3.5)
+        if USE_RULE_COMPLIANCE_IN_THRESHOLD:
+            # When enabled, factor rule compliance into the pass/fail decision
+            all_avg = sum(s.score for s in scores) / len(scores) if scores else 0
+            approved = all_avg >= 3.5
+
         verdicts.append(
             CriticVerdict(
-                slot_id=v_data["slot_id"],
+                slot_id=slot_id,
                 scores=scores,
                 average=round(avg, 2),
-                approved=v_data.get("approved", avg >= 3.5),
+                approved=approved,
                 summary=v_data.get("summary", ""),
             )
         )
@@ -191,8 +263,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             slate = Slate(**payload["slate"])
             brand = BrandKit(**payload["brand"])
-            user_id = payload.get("user_id", "")
-            brand_id = payload.get("brand_id", "")
             verdicts = critique_slate(slate, brand)
 
             reply_text = f"[CRITIC_REPLY:{session_id}]\n{json.dumps([v.dict() for v in verdicts])}"
@@ -203,12 +273,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     msg_id=uuid4(),
                     content=[TextContent(type="text", text=reply_text)],
                 ),
-            )
-            logger.info(
-                "Critic completed for user=%s brand=%s session=%s",
-                user_id,
-                brand_id,
-                session_id,
             )
         except Exception as exc:
             logger.error("Critic processing failed: %s", exc)
@@ -235,11 +299,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text=(
-                            "I'm the AgentBuffer Critic. I review content quality"
-                            " when dispatched by the Marketing Director."
-                            " Please chat with the main AgentBuffer agent instead."
-                        ),
+                        text="I'm the AgentBuffer Critic. I review content quality when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
                     ),
                     EndSessionContent(type="end-session"),
                 ],

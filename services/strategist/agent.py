@@ -28,7 +28,6 @@ from uagents_core.contrib.protocols.chat import (
 
 from services.shared.models import (
     BrandKit,
-    BrandPerformanceSummary,
     ContentSlot,
     MarketingAnalysis,
     Platform,
@@ -42,6 +41,68 @@ ASI_ONE_BASE_URL = os.environ.get("ASI_ONE_BASE_URL", "https://api.asi1.ai/v1")
 ASI_ONE_MODEL = os.environ.get("ASI_ONE_MODEL", "asi1")
 STRATEGIST_SEED = os.environ.get("STRATEGIST_SEED", "agentbuffer-strategist-seed-v1")
 STRATEGIST_PORT = int(os.environ.get("STRATEGIST_PORT", "8002"))
+
+# -- Tone-value-to-descriptor mappings ----------------------------------------
+
+_TONE_DESCRIPTORS: dict[str, list[tuple[int, str]]] = {
+    "formality": [
+        (33, "casual and conversational"),
+        (66, "balanced"),
+        (100, "professional and formal"),
+    ],
+    "humor": [
+        (33, "earnest and sincere"),
+        (66, "lightly playful"),
+        (100, "witty and humorous"),
+    ],
+    "boldness": [
+        (33, "understated"),
+        (66, "confident"),
+        (100, "bold and direct"),
+    ],
+    "warmth": [
+        (33, "informational"),
+        (66, "friendly"),
+        (100, "warm and personal"),
+    ],
+}
+
+
+def _describe_tone(dimension: str, value: int) -> str:
+    for threshold, label in _TONE_DESCRIPTORS.get(dimension, []):
+        if value <= threshold:
+            return label
+    return "balanced"
+
+
+def _build_tone_block(brand: BrandKit) -> str:
+    """Build a natural-language tone description from the BrandKit."""
+    tone = brand.tone
+    lines = [
+        f"- Formality: {_describe_tone('formality', tone.formality)} ({tone.formality}/100)",
+        f"- Humor: {_describe_tone('humor', tone.humor)} ({tone.humor}/100)",
+        f"- Boldness: {_describe_tone('boldness', tone.boldness)} ({tone.boldness}/100)",
+        f"- Warmth: {_describe_tone('warmth', tone.warmth)} ({tone.warmth}/100)",
+    ]
+    if brand.personality_keywords:
+        kw = ", ".join(brand.personality_keywords)
+        lines.append(f"- Personality keywords to reflect: {kw}")
+    return "\n".join(lines)
+
+
+def _build_reference_block(brand: BrandKit) -> str:
+    """Format reference posts as exemplars for the LLM."""
+    if not brand.reference_posts:
+        return ""
+    header = (
+        "The following posts represent ideal on-brand content for this brand. "
+        "Match their tone, style, and voice."
+    )
+    posts = []
+    for p in brand.reference_posts:
+        posts.append(f"  [{p.platform.value.upper()}] {p.text}")
+    return f"{header}\n" + "\n".join(posts)
+
 
 SLATE_SYSTEM_PROMPT = """\
 You are a content strategist AI. Given a brand profile and marketing analysis, generate exactly 7 \
@@ -62,17 +123,10 @@ Rules:
 - Each slot should cover a different content theme from the analysis
 - Slot numbers go from 1 to 7 (Monday to Sunday)
 - Make at least one slot intentionally weaker/more generic so the Critic has something to reject
+- If a tone profile is provided, strictly follow the tone descriptors in every caption
+- If reference posts are provided, use them as exemplars for voice and style
 
 Respond ONLY with the JSON array, no markdown fences or extra text.\
-"""
-
-PERFORMANCE_ADDENDUM = """\
-
-Historical Performance Context (advisory — the BrandKit still takes precedence):
-- Prefer content types from the "top_formats" list when they align with the brand.
-- Schedule posts at times from "best_times" when possible.
-- Avoid content patterns listed in "avoid_patterns".
-Use this data to inform your choices, but do NOT override the brand voice or themes.\
 """
 
 
@@ -89,22 +143,12 @@ def _clean_json_response(text: str) -> str:
     return text.strip()
 
 
-def generate_slate(
-    brand: BrandKit,
-    analysis: MarketingAnalysis,
-    performance_context: BrandPerformanceSummary | dict | None = None,
-) -> Slate:
-    """Generate a 7-day content slate using the LLM.
-
-    When *performance_context* is provided the Strategist will prefer
-    historically high-performing formats and times while still respecting
-    the BrandKit.
-    """
+def generate_slate(brand: BrandKit, analysis: MarketingAnalysis) -> Slate:
+    """Generate a 7-day content slate using the LLM."""
     client = _get_client()
 
-    system_prompt = SLATE_SYSTEM_PROMPT
-    if performance_context is not None:
-        system_prompt += PERFORMANCE_ADDENDUM
+    tone_block = _build_tone_block(brand)
+    ref_block = _build_reference_block(brand)
 
     context = (
         f"Brand: {brand.name}\n"
@@ -112,7 +156,9 @@ def generate_slate(
         f"Tagline: {brand.tagline}\n"
         f"Voice: {brand.voice_description}\n"
         f"Target Audience: {brand.target_audience}\n\n"
-        f"Marketing Analysis:\n"
+        f"Tone Profile:\n{tone_block}\n\n"
+        + (f"Reference Posts:\n{ref_block}\n\n" if ref_block else "")
+        + f"Marketing Analysis:\n"
         f"Positioning: {analysis.competitive_positioning}\n"
         f"Key Differentiators: {', '.join(analysis.key_differentiators)}\n"
         f"Audience Insights: {analysis.target_audience_insights}\n"
@@ -122,18 +168,10 @@ def generate_slate(
         f"Cadence: {analysis.weekly_cadence}\n"
     )
 
-    if performance_context is not None:
-        perf_data = (
-            performance_context.model_dump()
-            if isinstance(performance_context, BrandPerformanceSummary)
-            else performance_context
-        )
-        context += f"\nPerformance Context:\n{json.dumps(perf_data, indent=2)}\n"
-
     resp = client.chat.completions.create(
         model=ASI_ONE_MODEL,
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": SLATE_SYSTEM_PROMPT},
             {"role": "user", "content": context},
         ],
         max_tokens=4096,
@@ -177,79 +215,6 @@ def generate_slate(
     )
 
 
-REGEN_SYSTEM_PROMPT = """\
-You are a content strategist AI. A content slot was rejected during quality review. \
-Generate a SINGLE improved replacement slot for the same platform and time slot.
-
-Return valid JSON — a single object with:
-{
-  "caption": "The full post caption in the brand's voice",
-  "image_prompt": "A detailed visual description for AI image/video generation"
-}
-
-Rules:
-- Address the specific criticism in the rejection reason
-- Keep the same platform and general theme but significantly improve quality
-- Caption must be in the brand's voice and tone
-- Image prompt should be vivid, detailed, and brand-aligned
-- Make this noticeably better than the rejected version
-
-Respond ONLY with the JSON object, no markdown fences or extra text.\
-"""
-
-
-def regenerate_slot(
-    original_slot: ContentSlot,
-    rejection_reason: str,
-    brand: BrandKit,
-    analysis: MarketingAnalysis | None = None,
-) -> ContentSlot:
-    """Generate a replacement for a rejected content slot."""
-    client = _get_client()
-
-    context = (
-        f"Brand: {brand.name}\n"
-        f"Industry: {brand.industry}\n"
-        f"Tagline: {brand.tagline}\n"
-        f"Voice: {brand.voice_description}\n"
-        f"Target Audience: {brand.target_audience}\n\n"
-        f"Original Slot (REJECTED):\n"
-        f"  Platform: {original_slot.platform.value}\n"
-        f"  Caption: {original_slot.caption}\n"
-        f"  Image Prompt: {original_slot.image_prompt}\n\n"
-        f"Rejection Reason: {rejection_reason}\n"
-    )
-
-    if analysis:
-        context += (
-            f"\nMarketing Context:\n"
-            f"Themes: {', '.join(analysis.content_themes)}\n"
-            f"Tone: {analysis.tone_guidelines}\n"
-        )
-
-    resp = client.chat.completions.create(
-        model=ASI_ONE_MODEL,
-        messages=[
-            {"role": "system", "content": REGEN_SYSTEM_PROMPT},
-            {"role": "user", "content": context},
-        ],
-        max_tokens=2048,
-    )
-
-    raw = resp.choices[0].message.content or "{}"
-    data = json.loads(_clean_json_response(raw))
-
-    return ContentSlot(
-        slot_id=f"slot-{uuid4().hex[:8]}",
-        slot_number=original_slot.slot_number,
-        caption=data.get("caption", ""),
-        image_prompt=data.get("image_prompt", ""),
-        platform=original_slot.platform,
-        scheduled_for=original_slot.scheduled_for,
-        status="proposed",
-    )
-
-
 # ── Agentverse agent setup ──
 
 agent = Agent(
@@ -278,62 +243,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         if isinstance(item, TextContent):
             text += item.text
 
-    # Check for regeneration request
-    if text.startswith("[STRATEGIST_REGEN_REQUEST:"):
-        prefix_end = text.index("]")
-        prefix_content = text[len("[STRATEGIST_REGEN_REQUEST:") : prefix_end]
-        session_id, slot_id = prefix_content.split(":", 1)
-        payload_text = text[prefix_end + 1 :].strip()
-
-        try:
-            payload = json.loads(payload_text)
-            original_slot = ContentSlot(**payload["original_slot"])
-            brand = BrandKit(**payload["brand"])
-            analysis_data = payload.get("analysis")
-            analysis = (
-                MarketingAnalysis(**analysis_data)
-                if analysis_data and analysis_data != {}
-                else None
-            )
-            rejection_reason = payload.get(
-                "rejection_reason",
-                "User requested regeneration",
-            )
-
-            new_slot = regenerate_slot(
-                original_slot,
-                rejection_reason,
-                brand,
-                analysis,
-            )
-
-            reply_text = f"[STRATEGIST_REGEN_REPLY:{session_id}:{slot_id}]\n{new_slot.json()}"
-            await ctx.send(
-                sender,
-                ChatMessage(
-                    timestamp=datetime.now(tz=timezone.utc),
-                    msg_id=uuid4(),
-                    content=[TextContent(type="text", text=reply_text)],
-                ),
-            )
-        except Exception as exc:
-            logger.error("Strategist regeneration failed: %s", exc)
-            error_text = f"[STRATEGIST_REGEN_REPLY:{session_id}:{slot_id}]\n" + json.dumps(
-                {"error": str(exc)}
-            )
-            await ctx.send(
-                sender,
-                ChatMessage(
-                    timestamp=datetime.now(tz=timezone.utc),
-                    msg_id=uuid4(),
-                    content=[
-                        TextContent(type="text", text=error_text),
-                        EndSessionContent(type="end-session"),
-                    ],
-                ),
-            )
-        return
-
     # Check if this is a request from the Head Agent
     if text.startswith("[STRATEGIST_REQUEST:"):
         prefix_end = text.index("]")
@@ -344,10 +253,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             brand = BrandKit(**payload["brand"])
             analysis = MarketingAnalysis(**payload["analysis"])
-            user_id = payload.get("user_id", "")
-            brand_id = payload.get("brand_id", "")
-            perf_ctx = payload.get("performance_context")
-            slate = generate_slate(brand, analysis, performance_context=perf_ctx)
+            slate = generate_slate(brand, analysis)
 
             reply_text = f"[STRATEGIST_REPLY:{session_id}]\n{slate.json()}"
             await ctx.send(
@@ -357,12 +263,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     msg_id=uuid4(),
                     content=[TextContent(type="text", text=reply_text)],
                 ),
-            )
-            logger.info(
-                "Strategist completed for user=%s brand=%s session=%s",
-                user_id,
-                brand_id,
-                session_id,
             )
         except Exception as exc:
             logger.error("Strategist processing failed: %s", exc)
@@ -391,11 +291,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text=(
-                            "I'm the AgentBuffer Strategist. I generate content"
-                            " plans when dispatched by the Marketing Director."
-                            " Please chat with the main AgentBuffer agent instead."
-                        ),
+                        text="I'm the AgentBuffer Strategist. I generate content plans when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
                     ),
                     EndSessionContent(type="end-session"),
                 ],
