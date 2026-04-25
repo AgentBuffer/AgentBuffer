@@ -97,6 +97,22 @@ class CarouselResult(BaseModel):
     error: str | None = None
 
 
+class ApprovalQueueItem(BaseModel):
+    slot_id: str
+    platform: Platform
+    scheduled_time: datetime
+    content_text: str
+    video_url: str | None = None
+    critic_score: float
+    status: str = "pending"
+
+
+class ApprovalDecision(BaseModel):
+    session_id: str
+    slot_id: str
+    action: str  # "approve", "skip", "regenerate"
+
+
 class AgentEnvelope(BaseModel):
     from_agent: str
     to_agent: str
@@ -104,7 +120,6 @@ class AgentEnvelope(BaseModel):
     payload: dict
     signature: str
     timestamp: datetime
-
 
 
 class TrendContext(BaseModel):
