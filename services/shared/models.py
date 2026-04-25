@@ -89,6 +89,7 @@ class AgentEnvelope(BaseModel):
     timestamp: datetime
 
 
+
 class TrendContext(BaseModel):
     platform: Platform
     trending_topics: list[str]
@@ -129,3 +130,47 @@ class MarketingAnalysis(BaseModel):
     content_themes: list[str]
     tone_guidelines: str
     weekly_cadence: str
+
+
+# ---------------------------------------------------------------------------
+# Design Agent models
+# ---------------------------------------------------------------------------
+
+
+class DesignTaskType(str, Enum):
+    LOGO_VARIATION = "logo_variation"
+    MARKETING_HEADER = "marketing_header"
+    INFOGRAPHIC = "infographic"
+    SOCIAL_REBRAND = "social_rebrand"
+
+
+class DesignRequest(BaseModel):
+    task_description: str
+    task_type: DesignTaskType
+    brand_kit: BrandKit
+    platform: Platform | None = None
+    inputs: dict = {}
+
+
+class PlanStep(BaseModel):
+    step_id: str
+    agent: str
+    action: str
+    params: dict
+    depends_on: list[str] = []
+
+
+class DesignPlan(BaseModel):
+    task_id: str
+    request: DesignRequest
+    steps: list[PlanStep]
+    execution_order: str = "sequential"
+
+
+class SpecialistResult(BaseModel):
+    task_id: str
+    step_id: str
+    agent: str
+    success: bool
+    output_paths: list[str] = []
+    error: str | None = None

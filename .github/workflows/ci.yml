@@ -41,3 +41,12 @@ jobs:
       - run: |
           cd services/publisher
           uv run pytest tests/ -v || echo "No tests yet"
+
+  test-design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: |
+          pip install pydantic Pillow pytest
+          PYTHONPATH=. pytest services/design_director/tests/ services/design_specialists/tests/ -v
