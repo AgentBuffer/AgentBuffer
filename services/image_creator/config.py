@@ -10,9 +10,10 @@ IMAGEN_MODEL = os.environ.get("IMAGEN_MODEL", "imagen-4.0-generate-preview")
 MAX_RETRIES = int(os.environ.get("IMAGEN_MAX_RETRIES", "3"))
 RETRY_DELAY_SEC = float(os.environ.get("IMAGEN_RETRY_DELAY", "5"))
 
+# Imagen API supported ratios: 1:1, 4:3, 3:4, 16:9, 9:16
 IMAGE_ASPECT_RATIOS = {
-    "instagram": "4:5",
-    "linkedin": "1.91:1",
+    "instagram": "3:4",
+    "linkedin": "16:9",
     "x": "16:9",
     "tiktok": "9:16",
     "youtube": "16:9",

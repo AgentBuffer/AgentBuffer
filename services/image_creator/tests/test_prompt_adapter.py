@@ -107,14 +107,14 @@ class TestAdaptPrompt:
     ) -> None:
         result = adapt_prompt(slot_instagram, brand)
         assert isinstance(result, ImageRequest)
-        assert result.aspect_ratio == "4:5"
+        assert result.aspect_ratio == "3:4"
         assert result.platform == Platform.INSTAGRAM
 
     def test_linkedin_returns_correct_aspect_ratio(
         self, slot_linkedin: ContentSlot, brand: BrandKit
     ) -> None:
         result = adapt_prompt(slot_linkedin, brand)
-        assert result.aspect_ratio == "1.91:1"
+        assert result.aspect_ratio == "16:9"
         assert result.platform == Platform.LINKEDIN
 
     def test_x_returns_correct_aspect_ratio(self, slot_x: ContentSlot, brand: BrandKit) -> None:

@@ -55,8 +55,8 @@ Platform-specific prompt strategies:
 
 | Platform   | Aspect Ratio | Style                                                          |
 |------------|-------------|----------------------------------------------------------------|
-| Instagram  | 4:5         | Aesthetic, lifestyle photography, warm tones, editorial feel   |
-| LinkedIn   | 1.91:1      | Professional, clean, data-driven, corporate visual style       |
+| Instagram  | 3:4         | Aesthetic, lifestyle photography, warm tones, editorial feel   |
+| LinkedIn   | 16:9      | Professional, clean, data-driven, corporate visual style       |
 | X          | 16:9        | Bold, high-contrast, attention-grabbing, vibrant colors        |
 | TikTok     | 9:16        | Vibrant, vertical, trend-aware, energetic, youthful            |
 | YouTube    | 16:9        | Cinematic, professional photography with depth                 |
