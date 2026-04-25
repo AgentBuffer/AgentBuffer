@@ -83,10 +83,24 @@ class CognitionAgent:
     ) -> ExecutionPlan:
         """Produce an ``ExecutionPlan`` from a high-level prompt.
 
-        Uses deterministic heuristics for the PoC.  The full implementation
-        will add an LLM-based planning path that falls back to this logic.
+        Attempts LLM-based planning first; falls back to deterministic
+        heuristics if the LLM is unavailable or returns an invalid plan.
         """
         self._state = AgentState.PLANNING
+
+        # Try LLM planner first.
+        from src.agents.planner import llm_plan
+
+        llm_result = llm_plan(prompt, brand_kit, slots=slots)
+        if llm_result is not None:
+            logger.info(
+                "LLM plan %s: %d tool call(s)",
+                llm_result.execution_id,
+                len(llm_result.calls),
+            )
+            return llm_result
+
+        # Deterministic fallback.
         execution_id = f"exec-{uuid.uuid4().hex[:12]}"
 
         calls: list[ToolCall] = []
@@ -101,7 +115,7 @@ class CognitionAgent:
             parallel=True,
         )
         logger.info(
-            "Plan %s: %d tool call(s) generated",
+            "Deterministic plan %s: %d tool call(s) generated",
             execution_id,
             len(calls),
         )

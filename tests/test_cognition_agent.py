@@ -1,7 +1,7 @@
 """Tests for the Cognition Agent — verifies tool selection and execution logic.
 
-These tests use mock tool implementations (the PoC wrappers return canned
-results) so no real APIs are called.
+These tests use lightweight mock tool implementations so no real pipelines
+or APIs are called.
 """
 
 from __future__ import annotations
@@ -14,9 +14,87 @@ from src.agents.models import (
     ToolCallState,
     ToolName,
 )
-from src.agents.tools.carousel_tool import CarouselTool
-from src.agents.tools.design_tool import DesignTool
-from src.agents.tools.video_tool import VideoTool
+from src.agents.tools.base import BaseTool
+
+# ---------------------------------------------------------------------------
+# Lightweight mock tools (avoid importing real pipeline code)
+# ---------------------------------------------------------------------------
+
+
+class _MockDesignTool(BaseTool):
+    @property
+    def name(self) -> ToolName:
+        return ToolName.DESIGN
+
+    @property
+    def description(self) -> str:
+        return "Mock design tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {}
+
+    async def execute(self, **kwargs: object) -> dict:
+        platform = kwargs.get("platform", "linkedin")
+        return {
+            "task_id": "dtask-mock-001",
+            "success": True,
+            "output_paths": [f"output/designs/mock/{platform}_asset.png"],
+            "error": None,
+        }
+
+
+class _MockCarouselTool(BaseTool):
+    @property
+    def name(self) -> ToolName:
+        return ToolName.CAROUSEL
+
+    @property
+    def description(self) -> str:
+        return "Mock carousel tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {}
+
+    async def execute(self, **kwargs: object) -> dict:
+        slot_id = kwargs.get("slot_id", "slot-carousel-mock")
+        return {
+            "slot_id": slot_id,
+            "platform": kwargs.get("platform", "instagram"),
+            "slide_count": 7,
+            "slide_paths": [f"output/carousels/{slot_id}/slide_{i:02d}.png" for i in range(1, 8)],
+            "output_dir": f"output/carousels/{slot_id}",
+            "status": "success",
+            "error": None,
+        }
+
+
+class _MockVideoTool(BaseTool):
+    @property
+    def name(self) -> ToolName:
+        return ToolName.VIDEO
+
+    @property
+    def description(self) -> str:
+        return "Mock video tool"
+
+    @property
+    def parameters_schema(self) -> dict:
+        return {}
+
+    async def execute(self, **kwargs: object) -> dict:
+        slot_id = kwargs.get("slot_id", "slot-video-mock")
+        platform = kwargs.get("platform", "tiktok")
+        return {
+            "slot_id": slot_id,
+            "video_url": f"gs://mock/{platform}_{slot_id}.mp4",
+            "local_path": f"output/videos/{platform}_{slot_id}.mp4",
+            "platform": platform,
+            "duration_seconds": kwargs.get("duration_seconds", 8),
+            "status": "success",
+            "error": None,
+        }
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -39,7 +117,7 @@ MOCK_BRAND_KIT = {
 @pytest.fixture()
 def agent() -> CognitionAgent:
     """Create a CognitionAgent with all three mock tools registered."""
-    return CognitionAgent(tools=[DesignTool(), CarouselTool(), VideoTool()])
+    return CognitionAgent(tools=[_MockDesignTool(), _MockCarouselTool(), _MockVideoTool()])
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +334,7 @@ class TestErrorHandling:
     async def test_tool_exception_is_retried_and_fails(self) -> None:
         """A tool that always raises should be retried then marked failed."""
 
-        class FailingTool(VideoTool):
+        class FailingTool(_MockVideoTool):
             async def execute(self, **kwargs: object) -> dict:
                 raise RuntimeError("Veo API exploded")
 
@@ -275,7 +353,7 @@ class TestErrorHandling:
 
         call_count = 0
 
-        class ErrorThenSuccessTool(CarouselTool):
+        class ErrorThenSuccessTool(_MockCarouselTool):
             async def execute(self, **kwargs: object) -> dict:
                 nonlocal call_count
                 call_count += 1
