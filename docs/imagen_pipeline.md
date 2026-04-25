@@ -22,7 +22,7 @@ The Image Creator agent extends the existing `Strategist → Critic → Publishe
                                                  │   ┌──────────────┐
                                                  └──▶│  PUBLISHER   │
                                                      │ (posts via   │
-                                                     │  Ayrshare)   │
+                                                     │  direct APIs)│
                                                      └──────┬───────┘
                                                             ▼
                                               YouTube · TikTok · Instagram
@@ -73,7 +73,7 @@ For each `ImageRequest`:
 
 ### 5. Handoff to Publisher
 
-The Image Creator wraps all `ImageResult`s in an `AgentEnvelope` and sends to the Publisher. If images are saved locally, the Publisher uploads them to Supabase Storage via `_upload_to_storage()` to get public URLs before publishing to social platforms via Ayrshare.
+The Image Creator wraps all `ImageResult`s in an `AgentEnvelope` and sends to the Publisher. If images are saved locally, the Publisher uploads them to Supabase Storage via `_upload_to_storage()` to get public URLs before publishing to social platforms via its native API.
 
 ### 6. Carousel Integration
 

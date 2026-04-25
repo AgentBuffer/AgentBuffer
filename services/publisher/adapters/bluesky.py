@@ -42,7 +42,7 @@ class BlueskyAdapter(PlatformAdapter):
             logger.warning("No Bluesky credentials — simulating publish for slot %s", slot.slot_id)
             return PublishResult(
                 slot_id=slot.slot_id,
-                platform=Platform.X,
+                platform=Platform.BLUESKY,
                 success=True,
                 permalink=f"https://bsky.app/simulated/{slot.slot_id}",
                 idempotency_key=idempotency_key,
@@ -54,7 +54,7 @@ class BlueskyAdapter(PlatformAdapter):
                 if not token:
                     return PublishResult(
                         slot_id=slot.slot_id,
-                        platform=Platform.X,
+                        platform=Platform.BLUESKY,
                         success=False,
                         error="Bluesky authentication failed",
                         idempotency_key=idempotency_key,
@@ -83,14 +83,14 @@ class BlueskyAdapter(PlatformAdapter):
                 did = parts[2] if len(parts) > 2 else BLUESKY_HANDLE
                 return PublishResult(
                     slot_id=slot.slot_id,
-                    platform=Platform.X,
+                    platform=Platform.BLUESKY,
                     success=True,
                     permalink=f"https://bsky.app/profile/{did}/post/{rkey}",
                     idempotency_key=idempotency_key,
                 )
             return PublishResult(
                 slot_id=slot.slot_id,
-                platform=Platform.X,
+                platform=Platform.BLUESKY,
                 success=False,
                 error=f"Bluesky API error: {resp.status_code} — {resp.text}",
                 idempotency_key=idempotency_key,
@@ -98,7 +98,7 @@ class BlueskyAdapter(PlatformAdapter):
         except Exception as exc:
             return PublishResult(
                 slot_id=slot.slot_id,
-                platform=Platform.X,
+                platform=Platform.BLUESKY,
                 success=False,
                 error=str(exc),
                 idempotency_key=idempotency_key,

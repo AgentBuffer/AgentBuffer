@@ -294,7 +294,7 @@ Response 200:
 - Write an `agent_messages` row (envelope_type = "publish_result")
 - Return results
 
-**Agent connection:** `services/publisher/agent.py` → `publish_slots()` (inline mode) → Ayrshare API
+**Agent connection:** `services/publisher/agent.py` → `publish_slots()` (inline mode) → direct platform APIs
 
 ---
 
@@ -637,7 +637,7 @@ Response 200:
 | Table | Priority | Purpose |
 |-------|----------|---------|
 | `campaigns` | P1 | Track campaign pipeline runs from web UI |
-| `performance_records` | P2 | Store post-level analytics from Ayrshare |
+| `performance_records` | P2 | Store post-level analytics from platform APIs |
 
 ### Existing Table Modifications
 
