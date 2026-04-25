@@ -29,16 +29,12 @@ def handle_request(envelope: AgentEnvelope) -> AgentEnvelope:
     containing all specialist results.
     """
     if envelope.envelope_type != "design_request":
-        raise ValueError(
-            f"Expected envelope_type='design_request', got {envelope.envelope_type!r}"
-        )
+        raise ValueError(f"Expected envelope_type='design_request', got {envelope.envelope_type!r}")
 
     request = DesignRequest(**envelope.payload)
 
     if request.task_type is None:
-        request = request.model_copy(
-            update={"task_type": classify_task(request.task_description)}
-        )
+        request = request.model_copy(update={"task_type": classify_task(request.task_description)})
 
     plan = build_plan(request)
     logger.info("Generated plan %s with %d step(s)", plan.task_id, len(plan.steps))

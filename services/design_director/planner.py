@@ -41,9 +41,7 @@ def classify_task(description: str) -> DesignTaskType:
     lower = description.lower()
     scores: dict[DesignTaskType, int] = {}
     for task_type, keywords in _TASK_KEYWORDS.items():
-        scores[task_type] = sum(
-            1 for kw in keywords if re.search(rf"\b{re.escape(kw)}\b", lower)
-        )
+        scores[task_type] = sum(1 for kw in keywords if re.search(rf"\b{re.escape(kw)}\b", lower))
     best = max(scores, key=lambda t: scores[t])
     if scores[best] == 0:
         return DesignTaskType.MARKETING_HEADER

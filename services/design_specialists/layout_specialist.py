@@ -15,7 +15,7 @@ from services.shared.models import BrandKit, PlanStep, SpecialistResult
 
 from .common.brand_presets import PLATFORM_DIMENSIONS, BrandPreset
 from .common.canvas import create_canvas, draw_pill_button, place_logo
-from .common.text_layout import fit_text, load_font, measure_text_block, wrap_text
+from .common.text_layout import fit_text, load_font, measure_text_block
 
 OUTPUT_DIR = Path("output/designs")
 
