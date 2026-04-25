@@ -1632,12 +1632,13 @@ async def _handle_add_post(
     content_text = parts[5]
 
     # Validate platform
-    valid_platforms = {"instagram", "twitter", "linkedin", "tiktok"}
+    valid_platforms = {"instagram", "x", "twitter", "linkedin", "tiktok", "bluesky", "youtube"}
     if platform_raw not in valid_platforms:
         await _send_status(
             ctx,
             sender,
-            f"Invalid platform '{platform_raw}'. Choose from: instagram, twitter, linkedin, tiktok",
+            f"Invalid platform '{platform_raw}'. "
+            "Choose from: instagram, x, twitter, linkedin, tiktok, bluesky, youtube",
         )
         return
 
