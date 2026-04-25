@@ -57,15 +57,11 @@ def test_basic_summary():
         "perf:brand-1:p1": _make_record(
             "p1", Platform.INSTAGRAM, "carousel", 5.0, hour=9, weekday=0
         ),
-        "perf:brand-1:p2": _make_record(
-            "p2", Platform.INSTAGRAM, "video", 2.0, hour=14, weekday=2
-        ),
+        "perf:brand-1:p2": _make_record("p2", Platform.INSTAGRAM, "video", 2.0, hour=14, weekday=2),
         "perf:brand-1:p3": _make_record(
             "p3", Platform.INSTAGRAM, "carousel", 4.5, hour=9, weekday=0
         ),
-        "perf:brand-1:p4": _make_record(
-            "p4", Platform.LINKEDIN, "text", 3.0, hour=8, weekday=1
-        ),
+        "perf:brand-1:p4": _make_record("p4", Platform.LINKEDIN, "text", 3.0, hour=8, weekday=1),
     }
 
     ctx = _mock_ctx(records)
