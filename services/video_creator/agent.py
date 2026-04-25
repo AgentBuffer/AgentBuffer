@@ -152,6 +152,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             approved_slate = ApprovedSlate(**payload["approved_slate"])
             brand = BrandKit(**payload["brand"])
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
 
             results = await process_approved_slate(approved_slate, brand)
 
@@ -160,6 +162,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 default=str,
             )
             reply_text = f"[VIDEO_REPLY:{session_id}]\n{serialized}"
+            logger.info(
+                "Video Creator completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
+            )
             await ctx.send(
                 sender,
                 ChatMessage(

@@ -215,6 +215,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             brand = BrandKit(**payload["brand"])
             analysis = MarketingAnalysis(**payload["analysis"])
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
             perf_ctx = payload.get("performance_context")
             slate = generate_slate(brand, analysis, performance_context=perf_ctx)
 
@@ -226,6 +228,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     msg_id=uuid4(),
                     content=[TextContent(type="text", text=reply_text)],
                 ),
+            )
+            logger.info(
+                "Strategist completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
             )
         except Exception as exc:
             logger.error("Strategist processing failed: %s", exc)

@@ -166,7 +166,15 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         try:
             payload = json.loads(payload_text)
             slots = [ContentSlot(**s) for s in payload["slots"]]
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
             results = publish_slots(slots)
+            logger.info(
+                "Publisher completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
+            )
 
             serialized = json.dumps(
                 [r.dict() for r in results],

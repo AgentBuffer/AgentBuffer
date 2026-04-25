@@ -191,6 +191,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             payload = json.loads(payload_text)
             slate = Slate(**payload["slate"])
             brand = BrandKit(**payload["brand"])
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
             verdicts = critique_slate(slate, brand)
 
             reply_text = f"[CRITIC_REPLY:{session_id}]\n{json.dumps([v.dict() for v in verdicts])}"
@@ -201,6 +203,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     msg_id=uuid4(),
                     content=[TextContent(type="text", text=reply_text)],
                 ),
+            )
+            logger.info(
+                "Critic completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
             )
         except Exception as exc:
             logger.error("Critic processing failed: %s", exc)
