@@ -65,9 +65,7 @@ class VeoClient:
         attempt: int,
     ) -> VideoResult:
         try:
-            operation = await asyncio.to_thread(
-                self._submit_generation, request
-            )
+            operation = await asyncio.to_thread(self._submit_generation, request)
         except Exception as exc:
             logger.error(
                 "Veo submission failed (attempt %d) for slot %s: %s",
@@ -126,9 +124,7 @@ class VeoClient:
             delay = min(delay * POLL_BACKOFF_FACTOR, POLL_MAX_DELAY_SEC)
 
             try:
-                operation = await asyncio.to_thread(
-                    self._refresh_operation, operation
-                )
+                operation = await asyncio.to_thread(self._refresh_operation, operation)
             except Exception as exc:
                 logger.error(
                     "Veo poll refresh failed for slot %s: %s",

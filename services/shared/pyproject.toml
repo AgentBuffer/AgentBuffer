@@ -5,3 +5,6 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
 ]
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]

@@ -97,6 +97,31 @@ class CarouselResult(BaseModel):
     error: str | None = None
 
 
+class BrandRegistryEntry(BaseModel):
+    """A single brand owned by a user."""
+
+    brand_id: str
+    brand_name: str
+    created_at: datetime
+    last_active: datetime
+
+
+class ApprovalQueueItem(BaseModel):
+    slot_id: str
+    platform: Platform
+    scheduled_time: datetime
+    content_text: str
+    video_url: str | None = None
+    critic_score: float
+    status: str = "pending"
+
+
+class ApprovalDecision(BaseModel):
+    session_id: str
+    slot_id: str
+    action: str  # "approve", "skip", "regenerate"
+
+
 class AgentEnvelope(BaseModel):
     from_agent: str
     to_agent: str
@@ -105,6 +130,24 @@ class AgentEnvelope(BaseModel):
     signature: str
     timestamp: datetime
 
+
+class PerformanceRecord(BaseModel):
+    post_id: str
+    platform: Platform
+    published_at: datetime
+    content_type: str
+    likes: int = 0
+    shares: int = 0
+    comments: int = 0
+    reach: int = 0
+    engagement_rate: float = 0.0
+
+
+class BrandPerformanceSummary(BaseModel):
+    brand_id: str
+    top_formats: list[dict]
+    best_times: dict
+    avoid_patterns: list[str]
 
 
 class TrendContext(BaseModel):

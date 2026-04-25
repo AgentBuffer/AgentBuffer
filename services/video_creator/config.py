@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
 OUTPUT_DIR = Path(os.environ.get("VIDEO_OUTPUT_DIR", "output/videos"))
 
 VEO_MODEL = os.environ.get("VEO_MODEL", "veo-3.0-generate-preview")

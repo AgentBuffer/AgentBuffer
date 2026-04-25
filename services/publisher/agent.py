@@ -160,15 +160,27 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
     if text.startswith("[PUBLISH_REQUEST:"):
         prefix_end = text.index("]")
-        session_id = text[len("[PUBLISH_REQUEST:"):prefix_end]
-        payload_text = text[prefix_end + 1:].strip()
+        session_id = text[len("[PUBLISH_REQUEST:") : prefix_end]
+        payload_text = text[prefix_end + 1 :].strip()
 
         try:
             payload = json.loads(payload_text)
             slots = [ContentSlot(**s) for s in payload["slots"]]
+            user_id = payload.get("user_id", "")
+            brand_id = payload.get("brand_id", "")
             results = publish_slots(slots)
+            logger.info(
+                "Publisher completed for user=%s brand=%s session=%s",
+                user_id,
+                brand_id,
+                session_id,
+            )
 
-            reply_text = f"[PUBLISH_REPLY:{session_id}]\n{json.dumps([r.dict() for r in results], default=str)}"
+            serialized = json.dumps(
+                [r.dict() for r in results],
+                default=str,
+            )
+            reply_text = f"[PUBLISH_REPLY:{session_id}]\n{serialized}"
             await ctx.send(
                 sender,
                 ChatMessage(
@@ -185,7 +197,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     timestamp=datetime.now(tz=timezone.utc),
                     msg_id=uuid4(),
                     content=[
-                        TextContent(type="text", text=f"[PUBLISH_REPLY:{session_id}]\n" + json.dumps({"error": str(exc)})),
+                        TextContent(
+                            type="text",
+                            text=f"[PUBLISH_REPLY:{session_id}]\n"
+                            + json.dumps({"error": str(exc)}),
+                        ),
                         EndSessionContent(type="end-session"),
                     ],
                 ),
@@ -199,7 +215,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text="I'm the AgentBuffer Publisher. I publish approved content to social media platforms when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
+                        text=(
+                            "I'm the AgentBuffer Publisher. I publish approved"
+                            " content to social media platforms when dispatched"
+                            " by the Marketing Director. Please chat with the"
+                            " main AgentBuffer agent instead."
+                        ),
                     ),
                     EndSessionContent(type="end-session"),
                 ],
