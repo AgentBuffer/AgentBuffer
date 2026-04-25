@@ -57,5 +57,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: |
-          cd services/carousel_creator
-          uv run --extra test pytest tests/ -v
+          pip install pydantic Pillow pytest
+          PYTHONPATH=. pytest services/carousel_creator/tests/ -v
