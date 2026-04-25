@@ -80,6 +80,23 @@ class PublishResult(BaseModel):
     idempotency_key: str
 
 
+class SlideContent(BaseModel):
+    slide_number: int
+    slide_type: str  # "hook", "body", "cta"
+    headline: str
+    body: str
+    speaker_notes: str = ""
+
+
+class CarouselResult(BaseModel):
+    slot_id: str
+    platform: Platform
+    slide_paths: list[str]
+    output_dir: str
+    status: str  # "success", "error"
+    error: str | None = None
+
+
 class AgentEnvelope(BaseModel):
     from_agent: str
     to_agent: str

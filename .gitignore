@@ -41,8 +41,7 @@ coverage/
 .coverage
 htmlcov/
 
-# Generated design assets
+# Generated output
 output/
-
 # Misc
 *.log
