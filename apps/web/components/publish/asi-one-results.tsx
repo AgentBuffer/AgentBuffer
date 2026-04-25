@@ -20,7 +20,7 @@ export function AsiOneResults({ ranked, slots }: Props) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-neutral-700">
+      <h3 className="text-xs font-semibold text-slate-700 font-mono uppercase tracking-wider">
         ASI:One recommends these slots:
       </h3>
       {ranked.map((r) => {
@@ -30,18 +30,18 @@ export function AsiOneResults({ ranked, slots }: Props) {
           <Card key={r.slot_id}>
             <CardContent className="py-3">
               <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <Star className="h-4 w-4 text-amber-600" />
+                <div className="h-8 w-8 rounded bg-cyan-100 flex items-center justify-center shrink-0">
+                  <Star className="h-4 w-4 text-cyan-600" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">
                     #{r.rank}: Slot {slot.slot_number} (
                     {platformLabels[slot.platform] ?? slot.platform})
                   </p>
-                  <p className="text-sm text-neutral-600 line-clamp-1 mt-0.5">
+                  <p className="text-sm text-slate-600 line-clamp-1 mt-0.5">
                     &ldquo;{slot.caption}&rdquo;
                   </p>
-                  <p className="text-xs text-neutral-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     {r.reasoning}
                   </p>
                 </div>

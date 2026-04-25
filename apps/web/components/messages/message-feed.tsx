@@ -36,7 +36,7 @@ export function MessageFeed() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 font-mono text-sm">
         Loading agent activity...
       </div>
     );
@@ -44,7 +44,7 @@ export function MessageFeed() {
 
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 font-mono text-sm">
         No agent activity yet. Onboard a brand to get started.
       </div>
     );
@@ -56,7 +56,7 @@ export function MessageFeed() {
         <EnvelopeCard key={msg.id} envelope={msg} />
       ))}
       <div ref={bottomRef} />
-      <p className="text-center text-xs text-neutral-400">
+      <p className="text-center text-[10px] text-slate-400 font-mono">
         Auto-refreshing every 3s
       </p>
     </div>

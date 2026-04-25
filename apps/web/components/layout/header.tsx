@@ -19,19 +19,19 @@ export function Header({ brandName }: HeaderProps) {
   }
 
   return (
-    <header className="h-14 border-b border-neutral-200 bg-white flex items-center justify-between px-6">
+    <header className="h-13 border-b border-slate-200 bg-white flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-sm font-semibold text-neutral-900">AgentBuffer</h1>
+        <h1 className="text-sm font-semibold text-slate-900">AgentBuffer</h1>
         {brandName && (
           <>
-            <span className="text-neutral-300">/</span>
-            <span className="text-sm text-neutral-600">{brandName}</span>
+            <span className="text-slate-300">/</span>
+            <span className="text-sm text-slate-500">{brandName}</span>
           </>
         )}
       </div>
       <Button variant="ghost" size="sm" onClick={handleSignOut}>
         <LogOut className="h-4 w-4 mr-1.5" />
-        Sign out
+        <span className="font-mono text-xs uppercase">Sign out</span>
       </Button>
     </header>
   );

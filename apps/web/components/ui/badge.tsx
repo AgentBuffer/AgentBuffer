@@ -17,15 +17,15 @@ export function Badge({ variant = "default", className, children }: BadgeProps) 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide",
+        "inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono",
         {
-          "bg-neutral-100 text-neutral-700": variant === "default",
-          "bg-neutral-200 text-neutral-600": variant === "draft",
-          "bg-blue-100 text-blue-700": variant === "proposed",
-          "bg-red-100 text-red-700": variant === "rejected",
-          "bg-green-100 text-green-700": variant === "approved",
-          "bg-indigo-100 text-indigo-700": variant === "published",
-          "bg-orange-100 text-orange-700": variant === "failed",
+          "bg-slate-100 text-slate-600": variant === "default",
+          "bg-slate-100 text-slate-400": variant === "draft",
+          "bg-cyan-50 text-cyan-700": variant === "proposed",
+          "bg-red-50 text-red-500": variant === "rejected",
+          "bg-green-50 text-lime-600": variant === "approved",
+          "bg-violet-50 text-violet-600": variant === "published",
+          "bg-orange-50 text-orange-500": variant === "failed",
         },
         className
       )}

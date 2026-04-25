@@ -18,7 +18,7 @@ export function PublishResults({ results }: Props) {
   return (
     <Card>
       <CardContent className="py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-neutral-700">Published</h3>
+        <h3 className="text-xs font-semibold text-slate-700 font-mono uppercase tracking-wider">Published</h3>
         {results.map((r) => (
           <div
             key={`${r.slot_id}-${r.platform}`}
@@ -37,7 +37,7 @@ export function PublishResults({ results }: Props) {
                 href={r.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline ml-auto"
+                className="text-cyan-600 hover:underline ml-auto text-xs font-mono"
               >
                 permalink
               </a>
