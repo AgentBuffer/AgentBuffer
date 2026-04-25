@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}YouTube Automation{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="logo">YT<span class="accent">Auto</span></h1>
+            <p class="subtitle">Production System</p>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
+                <span class="icon">📊</span> Dashboard
+            </a></li>
+            <li><a href="/videos" class="{% if request.url.path == '/videos' %}active{% endif %}">
+                <span class="icon">🎬</span> Videos
+            </a></li>
+            <li><a href="/calendar-view" class="{% if request.url.path == '/calendar-view' %}active{% endif %}">
+                <span class="icon">📅</span> Calendar
+            </a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="api-status">
+                <span class="status-dot" id="apiStatus"></span>
+                <span id="apiStatusText">Checking...</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="toast-container"></div>
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal-content"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
