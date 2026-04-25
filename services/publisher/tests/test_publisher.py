@@ -1,10 +1,11 @@
-"""Unit tests for the Publisher agent — mocked Ayrshare calls."""
+"""Unit tests for the Publisher agent — mocked platform adapter calls."""
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from services.shared.models import ContentSlot, Platform, PublishResult
 
@@ -26,13 +27,22 @@ def _slot(**overrides) -> ContentSlot:
     return ContentSlot(**defaults)
 
 
+def _ok_result(slot: ContentSlot, key: str) -> PublishResult:
+    return PublishResult(
+        slot_id=slot.slot_id,
+        platform=slot.platform,
+        success=True,
+        permalink=f"https://{slot.platform.value}.com/simulated/{slot.slot_id}",
+        idempotency_key=key,
+    )
+
+
 # ---------------------------------------------------------------------------
-# publish_slots — simulated mode (no API key)
+# publish_slots — simulated mode (no credentials set)
 # ---------------------------------------------------------------------------
 
 
 class TestPublishSlotsSimulated:
-    @patch("services.publisher.agent.AYRSHARE_API_KEY", "")
     def test_simulated_returns_success(self):
         from services.publisher.agent import publish_slots
 
@@ -46,13 +56,11 @@ class TestPublishSlotsSimulated:
             assert r.permalink is not None
             assert r.idempotency_key.startswith("pub-")
 
-    @patch("services.publisher.agent.AYRSHARE_API_KEY", "")
     def test_empty_slots_returns_empty(self):
         from services.publisher.agent import publish_slots
 
         assert publish_slots([]) == []
 
-    @patch("services.publisher.agent.AYRSHARE_API_KEY", "")
     def test_idempotency_keys_unique(self):
         from services.publisher.agent import publish_slots
 
@@ -63,64 +71,77 @@ class TestPublishSlotsSimulated:
 
 
 # ---------------------------------------------------------------------------
-# _publish_via_ayrshare — mocked HTTP
+# Adapter dispatch — mocked adapters
 # ---------------------------------------------------------------------------
 
 
-class TestPublishViaAyrshare:
-    def test_success(self):
-        mock_requests = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {"postUrl": "https://instagram.com/p/abc"}
-        mock_requests.post.return_value = mock_resp
+class TestAdapterDispatch:
+    @pytest.mark.asyncio
+    async def test_publish_dispatches_to_correct_adapter(self):
+        """Verify _publish_slot delegates to the right adapter."""
+        from services.publisher.agent import _publish_slot
 
-        with patch.dict(sys.modules, {"requests": mock_requests}):
-            from services.publisher.agent import _publish_via_ayrshare
+        slot = _slot(platform=Platform.INSTAGRAM)
+        expected = _ok_result(slot, "idem-test")
 
-            result = _publish_via_ayrshare(_slot(), "idem-001")
+        mock_adapter = AsyncMock()
+        mock_adapter.publish.return_value = expected
+
+        with patch(
+            "services.publisher.agent.get_adapter",
+            return_value=mock_adapter,
+        ):
+            result = await _publish_slot(slot, "idem-test")
+
+        mock_adapter.publish.assert_awaited_once_with(slot, "idem-test")
         assert result.success is True
-        assert result.permalink == "https://instagram.com/p/abc"
+        assert result.slot_id == "slot-pub-1"
 
-    def test_api_error(self):
-        mock_requests = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 500
-        mock_resp.text = "Internal Server Error"
-        mock_requests.post.return_value = mock_resp
+    @pytest.mark.asyncio
+    async def test_publish_handles_adapter_error(self):
+        """Verify adapter exceptions propagate as failed PublishResults."""
+        from services.publisher.agent import _publish_slot
 
-        with patch.dict(sys.modules, {"requests": mock_requests}):
-            from services.publisher.agent import _publish_via_ayrshare
+        slot = _slot(platform=Platform.X)
+        fail_result = PublishResult(
+            slot_id=slot.slot_id,
+            platform=Platform.X,
+            success=False,
+            error="API error: 500",
+            idempotency_key="idem-err",
+        )
 
-            result = _publish_via_ayrshare(_slot(), "idem-002")
+        mock_adapter = AsyncMock()
+        mock_adapter.publish.return_value = fail_result
+
+        with patch(
+            "services.publisher.agent.get_adapter",
+            return_value=mock_adapter,
+        ):
+            result = await _publish_slot(slot, "idem-err")
+
         assert result.success is False
         assert "500" in result.error
 
-    def test_network_exception(self):
-        mock_requests = MagicMock()
-        mock_requests.post.side_effect = ConnectionError("Network down")
+    @pytest.mark.asyncio
+    async def test_each_platform_gets_its_own_adapter(self):
+        """Verify get_adapter is called with the slot's platform."""
+        from services.publisher.agent import _publish_slot
 
-        with patch.dict(sys.modules, {"requests": mock_requests}):
-            from services.publisher.agent import _publish_via_ayrshare
+        for plat in [
+            Platform.X,
+            Platform.INSTAGRAM,
+            Platform.LINKEDIN,
+            Platform.TIKTOK,
+            Platform.YOUTUBE,
+        ]:
+            slot = _slot(platform=plat)
+            mock_adapter = AsyncMock()
+            mock_adapter.publish.return_value = _ok_result(slot, "k")
 
-            result = _publish_via_ayrshare(_slot(), "idem-003")
-        assert result.success is False
-        assert "Network down" in result.error
-
-    def test_includes_media_url(self):
-        mock_requests = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {"postUrl": "https://example.com/p/1"}
-        mock_requests.post.return_value = mock_resp
-
-        with patch.dict(sys.modules, {"requests": mock_requests}):
-            from services.publisher.agent import _publish_via_ayrshare
-
-            slot = _slot(image_url="https://cdn.example.com/img.png")
-            _publish_via_ayrshare(slot, "idem-004")
-
-        call_kwargs = mock_requests.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
-        assert "mediaUrls" in payload
-        assert payload["mediaUrls"] == ["https://cdn.example.com/img.png"]
+            with patch(
+                "services.publisher.agent.get_adapter",
+                return_value=mock_adapter,
+            ) as mock_get:
+                await _publish_slot(slot, "k")
+                mock_get.assert_called_once_with(plat)

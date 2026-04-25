@@ -102,7 +102,7 @@
 |------|-------------|----------------|
 | `services/shared/tests/test_models.py` | 19 | Pydantic model round-trips, validation errors, enum coercion, optional fields |
 | `services/head_agent/tests/test_analysis.py` | 8 | `_clean_json_response`, `extract_brand_kit`, `generate_marketing_analysis` (mocked OpenAI) |
-| `services/publisher/tests/test_publisher.py` | 7 | Simulated publish (no API key), Ayrshare HTTP success/error/exception (mocked `requests`) |
+| `services/publisher/tests/test_publisher.py` | 7 | Simulated publish (no credentials), adapter dispatch, error propagation (mocked adapters) |
 | `services/video_creator/tests/test_agent.py` | 5 | `process_approved_slate` filtering, error propagation, `wrap_results_as_envelope` structure |
 | `services/carousel_creator/tests/test_agent.py` | 6 | Carousel generation for IG/LinkedIn, skip unapproved/non-carousel slots, envelope wrapping |
 | `services/design_director/tests/test_main.py` | 4 | `handle_request` wrong envelope type, specialist retry, unregistered specialist |
