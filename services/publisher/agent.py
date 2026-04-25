@@ -1,7 +1,10 @@
-"""Publisher uAgent — publishes approved content to social platforms via Ayrshare.
+"""Publisher uAgent — publishes approved content to social platforms.
 
 Receives approved ContentSlots + optional VideoResults from the Head Agent
 and schedules posts for publication.
+
+Uses per-platform adapters (services.publisher.adapters) to call each
+social network's native API directly — no third-party aggregator required.
 
 Can operate as:
   1. A standalone Agentverse agent (via Chat Protocol)
@@ -10,6 +13,7 @@ Can operate as:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -25,9 +29,9 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
+from services.publisher.adapters.base import get_adapter
 from services.shared.models import (
     ContentSlot,
-    Platform,
     PublishResult,
 )
 
@@ -35,99 +39,81 @@ logger = logging.getLogger(__name__)
 
 PUBLISHER_SEED = os.environ.get("PUBLISHER_SEED", "agentbuffer-publisher-seed-v1")
 PUBLISHER_PORT = int(os.environ.get("PUBLISHER_PORT", "8005"))
-AYRSHARE_API_KEY = os.environ.get("AYRSHARE_API_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "agent-media")
+
+
+async def _publish_slot(slot: ContentSlot, idempotency_key: str) -> PublishResult:
+    """Publish a single slot via the platform-specific adapter."""
+    adapter = get_adapter(slot.platform)
+    return await adapter.publish(slot, idempotency_key)
 
 
 def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
     """Publish content slots to their target platforms.
 
-    Currently returns simulated results. Replace with Ayrshare API calls
-    when the API key is configured.
+    Delegates to the appropriate platform adapter for each slot.
+    Falls back to simulated results when no credentials are configured
+    (each adapter handles this internally).
     """
     results = []
     for slot in slots:
         idempotency_key = f"pub-{slot.slot_id}-{uuid4().hex[:6]}"
-
-        if AYRSHARE_API_KEY:
-            result = _publish_via_ayrshare(slot, idempotency_key)
-        else:
-            result = PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=f"https://{slot.platform.value}.com/simulated/{slot.slot_id}",
-                error=None,
-                idempotency_key=idempotency_key,
-            )
-            logger.info(
-                "Simulated publish for slot %s to %s (no AYRSHARE_API_KEY)",
-                slot.slot_id,
-                slot.platform.value,
-            )
-
+        result = asyncio.get_event_loop().run_until_complete(_publish_slot(slot, idempotency_key))
         results.append(result)
 
     return results
 
 
-def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishResult:
-    """Publish a single slot via the Ayrshare API."""
+def _upload_to_storage(local_path: str) -> str:
+    """Upload a local file to Supabase Storage and return a public URL.
+
+    Falls back to the local path if Supabase credentials are not configured
+    or the upload fails.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        logger.info("Supabase Storage not configured, using local path: %s", local_path)
+        return local_path
+
     try:
-        import requests
+        from pathlib import Path
 
-        platform_map = {
-            Platform.LINKEDIN: "linkedin",
-            Platform.X: "twitter",
-            Platform.INSTAGRAM: "instagram",
-            Platform.TIKTOK: "tiktok",
-            Platform.YOUTUBE: "youtube",
-        }
+        import requests as _requests
 
-        payload = {
-            "post": slot.caption,
-            "platforms": [platform_map.get(slot.platform, "instagram")],
-            "scheduledDate": slot.scheduled_for.isoformat(),
-        }
+        file_path = Path(local_path)
+        if not file_path.exists():
+            logger.warning("Local file not found for upload: %s", local_path)
+            return local_path
 
-        if slot.image_url:
-            payload["mediaUrls"] = [slot.image_url]
+        storage_path = f"images/{file_path.name}"
+        upload_url = f"{SUPABASE_URL}/storage/v1/object/{STORAGE_BUCKET}/{storage_path}"
 
-        resp = requests.post(
-            "https://app.ayrshare.com/api/post",
-            headers={
-                "Authorization": f"Bearer {AYRSHARE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-
-        if resp.status_code == 200:
-            data = resp.json()
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=data.get("postUrl", ""),
-                error=None,
-                idempotency_key=idempotency_key,
+        with open(file_path, "rb") as f:
+            resp = _requests.post(
+                upload_url,
+                headers={
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": "image/png",
+                },
+                data=f.read(),
+                timeout=30,
             )
+
+        if resp.status_code in (200, 201):
+            public_url = f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{storage_path}"
+            logger.info("Uploaded %s → %s", local_path, public_url)
+            return public_url
         else:
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=False,
-                error=f"Ayrshare API error: {resp.status_code} — {resp.text}",
-                idempotency_key=idempotency_key,
+            logger.warning(
+                "Supabase upload failed (%d): %s — using local path",
+                resp.status_code,
+                resp.text,
             )
+            return local_path
     except Exception as exc:
-        return PublishResult(
-            slot_id=slot.slot_id,
-            platform=slot.platform,
-            success=False,
-            error=str(exc),
-            idempotency_key=idempotency_key,
-        )
+        logger.warning("Failed to upload to Supabase Storage: %s — using local path", exc)
+        return local_path
 
 
 # ── Agentverse agent setup ──

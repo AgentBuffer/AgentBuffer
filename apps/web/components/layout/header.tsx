@@ -1,9 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { StateBadge } from "@/components/keybinds/state-badge";
+import { LogOut, Keyboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useContext } from "react";
+import { KeybindContext } from "@/lib/keybinds/provider";
 
 interface HeaderProps {
   brandName?: string;
@@ -11,6 +14,7 @@ interface HeaderProps {
 
 export function Header({ brandName }: HeaderProps) {
   const router = useRouter();
+  const keybindCtx = useContext(KeybindContext);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -28,11 +32,29 @@ export function Header({ brandName }: HeaderProps) {
             <span className="text-sm text-slate-500">{brandName}</span>
           </>
         )}
+        {keybindCtx && <StateBadge />}
       </div>
-      <Button variant="ghost" size="sm" onClick={handleSignOut}>
-        <LogOut className="h-4 w-4 mr-1.5" />
-        <span className="font-mono text-xs uppercase">Sign out</span>
-      </Button>
+      <div className="flex items-center gap-2">
+        {keybindCtx && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              keybindCtx.dispatch({ type: "TOGGLE_KEYBIND_CHEAT_SHEET" })
+            }
+            aria-label="Keybind cheat sheet"
+          >
+            <Keyboard className="h-4 w-4 mr-1.5 opacity-60" />
+            <span className="font-mono text-[10px] text-slate-400">
+              Ctrl+Shift+/
+            </span>
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={handleSignOut}>
+          <LogOut className="h-4 w-4 mr-1.5" />
+          <span className="font-mono text-xs uppercase">Sign out</span>
+        </Button>
+      </div>
     </header>
   );
 }

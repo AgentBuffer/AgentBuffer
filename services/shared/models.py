@@ -14,6 +14,28 @@ class Platform(str, Enum):
     INSTAGRAM = "instagram"
     TIKTOK = "tiktok"
     YOUTUBE = "youtube"
+    BLUESKY = "bluesky"
+
+
+class ToneProfile(BaseModel):
+    formality: int = 50
+    humor: int = 50
+    boldness: int = 50
+    warmth: int = 50
+
+
+class ContentRules(BaseModel):
+    always_do: list[str] = []
+    never_do: list[str] = []
+
+
+class ReferencePost(BaseModel):
+    post_id: str
+    platform: Platform
+    text: str
+    source: str = "manual"  # "imported" | "manual"
+    source_meta: str = ""
+    added_at: datetime | None = None
 
 
 class BrandKit(BaseModel):
@@ -27,6 +49,12 @@ class BrandKit(BaseModel):
     logo_url: str | None = None
     sample_captions: list[str]
     industry: str
+    version: int = 1
+    last_updated: datetime | None = None
+    tone: ToneProfile = ToneProfile()
+    personality_keywords: list[str] = []
+    content_rules: ContentRules = ContentRules()
+    reference_posts: list[ReferencePost] = []
 
 
 class ContentSlot(BaseModel):
@@ -46,6 +74,13 @@ class Slate(BaseModel):
     org_id: str
     slots: list[ContentSlot]
     generation_context: str
+
+
+class BrandKitHistoryEntry(BaseModel):
+    version: int
+    timestamp: datetime
+    changed_fields: list[str]
+    snapshot: dict
 
 
 class CriticScore(BaseModel):
@@ -95,31 +130,6 @@ class CarouselResult(BaseModel):
     output_dir: str
     status: str  # "success", "error"
     error: str | None = None
-
-
-class BrandRegistryEntry(BaseModel):
-    """A single brand owned by a user."""
-
-    brand_id: str
-    brand_name: str
-    created_at: datetime
-    last_active: datetime
-
-
-class ApprovalQueueItem(BaseModel):
-    slot_id: str
-    platform: Platform
-    scheduled_time: datetime
-    content_text: str
-    video_url: str | None = None
-    critic_score: float
-    status: str = "pending"
-
-
-class ApprovalDecision(BaseModel):
-    session_id: str
-    slot_id: str
-    action: str  # "approve", "skip", "regenerate"
 
 
 class AgentEnvelope(BaseModel):
@@ -175,6 +185,25 @@ class VideoResult(BaseModel):
     platform: Platform
     duration_seconds: int | None = None
     status: str
+    error: str | None = None
+
+
+class ImageRequest(BaseModel):
+    slot_id: str
+    prompt: str
+    aspect_ratio: str
+    platform: Platform
+    style: str | None = None
+    brand_context: str
+    negative_prompt: str = ""
+
+
+class ImageResult(BaseModel):
+    slot_id: str
+    image_url: str | None = None
+    local_path: str | None = None
+    platform: Platform
+    status: str  # "success", "error"
     error: str | None = None
 
 
