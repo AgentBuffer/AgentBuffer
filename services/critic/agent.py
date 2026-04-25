@@ -299,7 +299,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[
                     TextContent(
                         type="text",
-                        text="I'm the AgentBuffer Critic. I review content quality when dispatched by the Marketing Director. Please chat with the main AgentBuffer agent instead.",
+                        text=(
+                            "I'm the AgentBuffer Critic. I review content quality when "
+                            "dispatched by the Marketing Director. "
+                            "Please chat with the main AgentBuffer agent instead."
+                        ),
                     ),
                     EndSessionContent(type="end-session"),
                 ],
