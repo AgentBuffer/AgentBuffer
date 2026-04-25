@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 PUBLISHER_SEED = os.environ.get("PUBLISHER_SEED", "agentbuffer-publisher-seed-v1")
 PUBLISHER_PORT = int(os.environ.get("PUBLISHER_PORT", "8005"))
 AYRSHARE_API_KEY = os.environ.get("AYRSHARE_API_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "agent-media")
 
 
 def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
@@ -70,6 +73,56 @@ def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
     return results
 
 
+def _upload_to_storage(local_path: str) -> str:
+    """Upload a local file to Supabase Storage and return a public URL.
+
+    Falls back to the local path if Supabase credentials are not configured
+    or the upload fails.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        logger.info("Supabase Storage not configured, using local path: %s", local_path)
+        return local_path
+
+    try:
+        from pathlib import Path
+
+        import requests as _requests
+
+        file_path = Path(local_path)
+        if not file_path.exists():
+            logger.warning("Local file not found for upload: %s", local_path)
+            return local_path
+
+        storage_path = f"images/{file_path.name}"
+        upload_url = f"{SUPABASE_URL}/storage/v1/object/{STORAGE_BUCKET}/{storage_path}"
+
+        with open(file_path, "rb") as f:
+            resp = _requests.post(
+                upload_url,
+                headers={
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": "image/png",
+                },
+                data=f.read(),
+                timeout=30,
+            )
+
+        if resp.status_code in (200, 201):
+            public_url = f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{storage_path}"
+            logger.info("Uploaded %s → %s", local_path, public_url)
+            return public_url
+        else:
+            logger.warning(
+                "Supabase upload failed (%d): %s — using local path",
+                resp.status_code,
+                resp.text,
+            )
+            return local_path
+    except Exception as exc:
+        logger.warning("Failed to upload to Supabase Storage: %s — using local path", exc)
+        return local_path
+
+
 def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishResult:
     """Publish a single slot via the Ayrshare API."""
     try:
@@ -90,7 +143,11 @@ def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishRes
         }
 
         if slot.image_url:
-            payload["mediaUrls"] = [slot.image_url]
+            media_url = slot.image_url
+            if not media_url.startswith("http"):
+                media_url = _upload_to_storage(media_url)
+            if media_url.startswith("http"):
+                payload["mediaUrls"] = [media_url]
 
         resp = requests.post(
             "https://app.ayrshare.com/api/post",
