@@ -88,6 +88,7 @@ class ImagenClient:
             model=IMAGEN_MODEL,
             prompt=request.prompt,
             config=genai_types.GenerateImagesConfig(
+                negative_prompt=request.negative_prompt or None,
                 aspect_ratio=request.aspect_ratio,
                 number_of_images=1,
             ),
