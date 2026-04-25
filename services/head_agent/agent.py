@@ -569,6 +569,14 @@ async def _enter_approval_gate(
     slate_json = _load(ctx, session_id, "slate")
     slate = Slate.parse_raw(slate_json)
 
+    # Preserve any existing manual posts before overwriting the queue
+    existing_json = ctx.storage.get(f"approval_queue:{session_id}")
+    existing_manual = []
+    if existing_json:
+        for item in json.loads(existing_json):
+            if item.get("note") == "manually added":
+                existing_manual.append(item)
+
     queue_items = []
     for slot in slate.slots:
         verdict = next(
@@ -587,6 +595,9 @@ async def _enter_approval_gate(
                 "status": "pending",
             }
         )
+
+    # Re-append manual posts so they aren't lost
+    queue_items.extend(existing_manual)
 
     ctx.storage.set(
         f"approval_queue:{session_id}",
@@ -1162,7 +1173,28 @@ async def _finalize_approved_slots(
 
     slate_json = _load(ctx, session_id, "slate")
     slate = Slate.parse_raw(slate_json)
+    slate_ids = {s.slot_id for s in slate.slots}
     approved_slots = [s for s in slate.slots if s.slot_id in approved_ids]
+
+    # Include manual posts that exist in the queue but not in the slate
+    for item in queue_items:
+        if item["slot_id"] in approved_ids and item["slot_id"] not in slate_ids:
+            from services.shared.models import ContentSlot as CS
+            from services.shared.models import Platform as Plat
+
+            approved_slots.append(
+                CS(
+                    slot_id=item["slot_id"],
+                    slot_number=len(approved_slots) + 1,
+                    caption=item.get("content_text", ""),
+                    image_prompt="",
+                    platform=Plat(item["platform"]),
+                    scheduled_for=datetime.fromisoformat(
+                        item["scheduled_time"].replace("Z", "+00:00")
+                    ),
+                    status="approved",
+                )
+            )
 
     _store(ctx, session_id, "stage", "publish")
 
