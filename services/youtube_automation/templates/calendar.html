@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Calendar - YouTube Automation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Content Calendar</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="generateCalendar()">Generate 4-Week Calendar</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>This Week</h2>
+    <div id="weeklyView" class="calendar-grid">
+        <p class="empty-state">Loading calendar...</p>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Upcoming (Next 14 Days)</h2>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Type</th>
+                    <th>Platform</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="upcomingTable">
+                <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Shorts Posting Schedule</h2>
+    <div id="shortsSchedule" class="schedule-grid">
+        <p class="empty-state">Loading...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadCalendar);
+
+async function loadCalendar() {
+    // Load weekly summary
+    try {
+        const weekly = await api('/api/calendar/weekly');
+        renderWeekly(weekly);
+    } catch (e) {}
+
+    // Load upcoming
+    try {
+        const upcoming = await api('/api/calendar/upcoming?days=14');
+        renderUpcoming(upcoming.entries);
+    } catch (e) {}
+
+    // Load shorts schedule
+    try {
+        const shorts = await api('/api/shorts/schedule');
+        renderShortsSchedule(shorts.schedule);
+    } catch (e) {}
+}
+
+function renderWeekly(data) {
+    const el = document.getElementById('weeklyView');
+    if (!data.entries || !data.entries.length) {
+        el.innerHTML = '<p class="empty-state">No content scheduled this week. Generate a calendar!</p>';
+        return;
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const grouped = {};
+    days.forEach(d => grouped[d] = []);
+    data.entries.forEach(e => {
+        if (grouped[e.day]) grouped[e.day].push(e);
+    });
+
+    el.innerHTML = days.map(day => `
+        <div class="calendar-day">
+            <h3>${day}</h3>
+            ${grouped[day].length ? grouped[day].map(e => `
+                <div class="calendar-item ${e.status}">
+                    <span class="badge badge-${e.type}">${e.type}</span>
+                    <span class="platform">${e.platform}</span>
+                    <p>${e.title}</p>
+                    ${e.status === 'planned' ? `<button class="btn btn-sm" onclick="markComplete(${e.id})">Done</button>` : ''}
+                </div>
+            `).join('') : '<p class="day-empty">No content</p>'}
+        </div>
+    `).join('');
+}
+
+function renderUpcoming(entries) {
+    const tbody = document.getElementById('upcomingTable');
+    if (!entries || !entries.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No upcoming content</td></tr>';
+        return;
+    }
+    tbody.innerHTML = entries.map(e => `
+        <tr>
+            <td>${new Date(e.date).toLocaleDateString()}</td>
+            <td>${e.day}</td>
+            <td><span class="badge badge-${e.type}">${e.type}</span></td>
+            <td>${e.platform}</td>
+            <td>${e.title}</td>
+            <td><span class="badge badge-${e.status}">${e.status}</span></td>
+            <td>
+                ${e.status === 'planned' ? `<button class="btn btn-sm" onclick="markComplete(${e.id})">Complete</button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderShortsSchedule(schedule) {
+    const el = document.getElementById('shortsSchedule');
+    el.innerHTML = `
+        <table class="data-table">
+            <thead><tr><th>Day</th><th>Platform</th><th>Time</th><th>Clip Type</th></tr></thead>
+            <tbody>
+                ${schedule.map(s => `
+                    <tr>
+                        <td>${s.day}</td>
+                        <td>${s.platform}</td>
+                        <td>${s.time}</td>
+                        <td><span class="badge">${s.type}</span></td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+async function generateCalendar() {
+    showToast('Generating 4-week calendar...', 'info');
+    try {
+        const result = await api('/api/calendar/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({weeks: 4}),
+        });
+        showToast(`Calendar generated: ${result.entries_created} entries`, 'success');
+        loadCalendar();
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+async function markComplete(id) {
+    try {
+        await api(`/api/calendar/${id}/complete`, {method: 'POST'});
+        showToast('Marked complete', 'success');
+        loadCalendar();
+    } catch (e) {
+        showToast('Error', 'error');
+    }
+}
+</script>
+{% endblock %}
