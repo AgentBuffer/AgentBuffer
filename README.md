@@ -29,7 +29,7 @@ AgentBuffer is a multi-agent marketing automation platform built on [Fetch.ai's 
 - Platform-optimized video generation via Google Veo
 - Automated carousel/slideshow rendering with Pillow
 - Autonomous design asset creation (banners, headers, infographics)
-- Multi-platform publishing via Ayrshare (LinkedIn, X, Instagram, TikTok, YouTube)
+- Multi-platform publishing via direct platform APIs (LinkedIn, X, Instagram, TikTok, YouTube, Bluesky)
 - Performance feedback loop for data-driven content optimization
 - Human-in-the-loop approval gate before publishing
 - MCP Server for enterprise AI agent integration
@@ -63,7 +63,7 @@ AgentBuffer is a multi-agent marketing automation platform built on [Fetch.ai's 
  ┌────────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
  │ STRATEGIST │ │ CRITIC │ │  VIDEO   │ │ CAROUSEL │ │PUBLISHER │
  │            │ │        │ │ CREATOR  │ │ CREATOR  │ │          │
- │ 7-day     │ │ 5-axis │ │ Google   │ │ Pillow   │ │ Ayrshare │
+ │ 7-day     │ │ 5-axis │ │ Google   │ │ Pillow   │ │ Direct   │
  │ content   │ │ rubric │ │ Veo API  │ │ renderer │ │ multi-   │
  │ slates    │ │ rejects│ │ per-plat │ │ 1080x1350│ │ platform │
  │ via LLM   │ │ weak   │ │ trends   │ │ slides   │ │ posts    │
@@ -75,7 +75,7 @@ AgentBuffer is a multi-agent marketing automation platform built on [Fetch.ai's 
             │  DESIGN DIRECTOR  │     │ PERFORMANCE          │
             │                   │     │ HARVESTER            │
             │  Interprets       │     │                      │
-            │  design requests  │     │ Daily Ayrshare       │
+            │  design requests  │     │ Daily platform       │
             │  & delegates to   │     │ analytics → feedback │
             │  specialists      │     │ loop to Strategist   │
             └────────┬──────────┘     └──────────────────────┘
@@ -102,8 +102,8 @@ All agents are registered on [Agentverse](https://agentverse.ai) with the mandat
 | **Strategist** | Generates 7-day content slates with platform-optimized captions and image/video prompts | `services/strategist/` | 8002 |
 | **Critic** | 5-axis quality scoring; must reject at least 1 slot per slate | `services/critic/` | 8003 |
 | **Video Creator** | Platform-specific video generation via Google Veo with trend adaptation | `services/video_creator/` | 8004 |
-| **Publisher** | Multi-platform publishing and scheduling via Ayrshare API | `services/publisher/` | 8005 |
-| **Performance Harvester** | Daily scheduled agent that fetches Ayrshare analytics and builds performance summaries | `services/performance_harvester/` | 8006 |
+| **Publisher** | Multi-platform publishing and scheduling via direct platform APIs | `services/publisher/` | 8005 |
+| **Performance Harvester** | Daily scheduled agent that fetches platform analytics and builds performance summaries | `services/performance_harvester/` | 8006 |
 | **Carousel Creator** | Paginates marketing copy into 5-10 slide narratives and renders 1080x1350 PNGs | `services/carousel_creator/` | — |
 | **Design Director** | Interprets design requests, classifies task types, builds execution plans, delegates to specialists | `services/design_director/` | — |
 | **Layout Specialist** | Renders pixel-perfect marketing assets (banners, headers, infographics) using Pillow | `services/design_specialists/` | — |
@@ -126,7 +126,7 @@ flowchart TD
     G --> J[Approval Gate]
     H --> J
     I --> J
-    J -->|Approved| K[Publisher: Ayrshare API]
+    J -->|Approved| K[Publisher: Direct Platform APIs]
     K --> L[Performance Harvester: Analytics]
     L -->|Feedback| D
     J -->|Regenerate| D
@@ -143,7 +143,7 @@ flowchart TD
 | **4. Critique** | Quality gate — 5-axis scoring rubric | Each slot scored on Brand Voice, Visual Coherence, Platform Fit, Audience Relevance, Originality. At least 1 slot must be rejected |
 | **5. Create** | Generate media assets | Video Creator (Veo), Carousel Creator (Pillow), or Design Director routes based on content type |
 | **6. Approval** | Human-in-the-loop review | Content preview queue; users can approve, skip, or request regeneration per slot |
-| **7. Publish** | Cross-platform distribution | Ayrshare API schedules posts with idempotency keys and dead-letter handling |
+| **7. Publish** | Cross-platform distribution | Direct platform APIs schedule posts with idempotency keys and dead-letter handling |
 | **8. Report** | Final campaign summary | Compiled report sent back to user via ASI:One chat |
 
 ---
@@ -368,7 +368,7 @@ MCP_API_KEYS=your-key-here uvicorn src.mcp_server.server:app --host 0.0.0.0 --po
 The **Performance Harvester** closes the optimization loop:
 
 1. Runs daily via uAgents scheduling
-2. Fetches analytics from Ayrshare for posts published in the last 7 days
+2. Fetches analytics from platform APIs for posts published in the last 7 days
 3. Stores `PerformanceRecord` per post (likes, shares, comments, reach, engagement rate)
 4. Builds `BrandPerformanceSummary` with:
    - **Top formats**: best content types by engagement rate per platform
@@ -401,9 +401,9 @@ AgentBuffer/
 │   │   ├── pagination.py         # Narrative pagination engine (5-10 slides)
 │   │   └── renderer.py           # Pillow-based 1080x1350 image renderer
 │   ├── publisher/                # Social media distribution
-│   │   └── agent.py              # Ayrshare API integration with idempotency
+│   │   └── agent.py              # Direct platform API integration with idempotency
 │   ├── performance_harvester/    # Analytics feedback loop
-│   │   ├── agent.py              # Daily Ayrshare analytics fetcher
+│   │   ├── agent.py              # Daily platform analytics fetcher
 │   │   └── summary.py            # BrandPerformanceSummary builder
 │   ├── design_director/          # Autonomous design planner
 │   │   ├── main.py               # Director entry: handle_request()
@@ -425,7 +425,7 @@ AgentBuffer/
 │       ├── models.py             # CampaignRequest/Response schemas
 │       └── auth.py               # API key middleware
 ├── apps/web/                     # Next.js 16 dashboard (React 19, Tailwind, Supabase auth)
-├── gateway/                      # FastAPI gateway (placeholder)
+├── gateway/                      # FastAPI gateway
 ├── supabase/migrations/          # PostgreSQL schema (organizations, brands, content_slots, etc.)
 ├── docs/                         # Design documents
 │   ├── veo_pipeline.md
@@ -446,7 +446,7 @@ AgentBuffer/
 | **LLM** | [ASI:One](https://asi1.ai) (OpenAI-compatible API) |
 | **Video Generation** | [Google Veo](https://deepmind.google/technologies/veo/) via `google-genai` SDK |
 | **Image Rendering** | [Pillow](https://pillow.readthedocs.io/) (carousel slides + marketing assets) |
-| **Publishing** | [Ayrshare](https://www.ayrshare.com/) (LinkedIn, X, Instagram, TikTok, YouTube) |
+| **Publishing** | Direct Platform APIs (X, Instagram, LinkedIn, TikTok, YouTube, Bluesky) |
 | **MCP Server** | [Model Context Protocol](https://modelcontextprotocol.io/) + FastAPI + SSE |
 | **Frontend** | Next.js 16, React 19, Tailwind CSS |
 | **Database** | [Supabase](https://supabase.com/) (PostgreSQL + Row Level Security) |
@@ -469,7 +469,7 @@ The Supabase PostgreSQL database uses Row Level Security (RLS) with org_id isola
 | `agent_messages` | Inter-agent message ledger (from_agent, to_agent, envelope_type, payload) |
 | `dead_letters` | Failed publish attempts for retry/debugging |
 
-Supported platforms: `linkedin`, `x`, `instagram`, `tiktok`, `youtube`
+Supported platforms: `linkedin`, `x`, `instagram`, `tiktok`, `youtube`, `bluesky`
 
 ---
 
@@ -503,7 +503,7 @@ cp .env.example .env
 |---|---|---|
 | `ASI_ONE_API_KEY` | [ASI:One](https://asi1.ai) | LLM for brand analysis, strategy, and critique |
 | `GOOGLE_AI_API_KEY` | Google Cloud | Veo video generation |
-| `AYRSHARE_API_KEY` | [Ayrshare](https://ayrshare.com) | Social media publishing |
+| `X_API_KEY` / `INSTAGRAM_ACCESS_TOKEN` / etc. | Platform APIs | Social media publishing (see `.env.example` for full list) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Database and auth |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Client-side auth |
 

@@ -1,4 +1,4 @@
-"""PerformanceHarvester — daily scheduled agent that fetches Ayrshare analytics.
+"""PerformanceHarvester — daily scheduled agent that fetches platform analytics.
 
 Runs once daily via uAgents Bureau scheduling.  For every post published in the
 last 7 days it stores a PerformanceRecord in ``ctx.storage`` keyed as:
@@ -15,18 +15,15 @@ import logging
 import os
 from datetime import datetime, timezone
 
-import httpx
 from uagents import Agent, Context
 
 from services.shared.models import PerformanceRecord, Platform
 
 logger = logging.getLogger(__name__)
 
-AYRSHARE_API_KEY = os.environ.get("AYRSHARE_API_KEY", "")
 HARVESTER_SEED = os.environ.get("HARVESTER_SEED", "agentbuffer-harvester-seed-v1")
 HARVESTER_PORT = int(os.environ.get("HARVESTER_PORT", "8006"))
 HARVESTER_BRAND_ID = os.environ.get("HARVESTER_BRAND_ID", "brand-default")
-AYRSHARE_BASE_URL = "https://app.ayrshare.com/api"
 
 PLATFORM_MAP: dict[str, Platform] = {
     "twitter": Platform.X,
@@ -34,6 +31,7 @@ PLATFORM_MAP: dict[str, Platform] = {
     "instagram": Platform.INSTAGRAM,
     "tiktok": Platform.TIKTOK,
     "youtube": Platform.YOUTUBE,
+    "bluesky": Platform.BLUESKY,
 }
 
 agent = Agent(
@@ -44,60 +42,33 @@ agent = Agent(
 
 
 async def fetch_post_analytics(post_id: str) -> dict | None:
-    """Call Ayrshare ``/analytics/post`` for a single post."""
-    if not AYRSHARE_API_KEY:
-        logger.warning("No AYRSHARE_API_KEY set — skipping analytics fetch")
-        return None
+    """Fetch analytics for a single post via the appropriate platform API.
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            f"{AYRSHARE_BASE_URL}/analytics/post",
-            headers={
-                "Authorization": f"Bearer {AYRSHARE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={"id": post_id},
-        )
-        if resp.status_code == 200:
-            return resp.json()
-        logger.error(
-            "Ayrshare analytics error for post %s: %s — %s",
-            post_id,
-            resp.status_code,
-            resp.text,
-        )
-        return None
+    Currently a stub — returns None. Replace with per-platform API calls
+    when credentials are configured.
+    """
+    logger.warning("Analytics fetch not yet implemented for post %s", post_id)
+    return None
 
 
 async def fetch_recent_posts() -> list[dict]:
-    """Fetch posts published in the last 7 days from the Ayrshare history endpoint."""
-    if not AYRSHARE_API_KEY:
-        logger.warning("No AYRSHARE_API_KEY set — skipping history fetch")
-        return []
+    """Fetch posts published in the last 7 days.
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(
-            f"{AYRSHARE_BASE_URL}/history",
-            headers={
-                "Authorization": f"Bearer {AYRSHARE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            params={"lastDays": 7},
-        )
-        if resp.status_code == 200:
-            return resp.json() if isinstance(resp.json(), list) else []
-        logger.error("Ayrshare history error: %s — %s", resp.status_code, resp.text)
-        return []
+    Currently a stub — returns empty list. Replace with per-platform API
+    calls when credentials are configured.
+    """
+    logger.warning("Recent posts fetch not yet implemented")
+    return []
 
 
 def _parse_platform(raw: str | list) -> Platform:
-    """Normalise Ayrshare platform strings to our Platform enum."""
+    """Normalise platform strings to our Platform enum."""
     name = raw[0] if isinstance(raw, list) else raw
     return PLATFORM_MAP.get(name.lower(), Platform.INSTAGRAM)
 
 
 def _extract_engagement(analytics: dict, platform_key: str) -> dict:
-    """Pull engagement numbers from an Ayrshare analytics response."""
+    """Pull engagement numbers from a platform analytics response."""
     data = analytics.get(platform_key, analytics)
     likes = int(data.get("likes", data.get("likeCount", 0)))
     shares = int(data.get("shares", data.get("shareCount", data.get("retweetCount", 0))))

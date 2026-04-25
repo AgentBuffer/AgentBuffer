@@ -5,6 +5,7 @@ import type {
   RankedSlot,
   PublishResult,
   Platform,
+  CalendarResponse,
 } from "@/lib/types/models";
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://localhost:8000";
@@ -182,6 +183,54 @@ const MOCK_SLOTS: ContentSlot[] = [
     critic_average: 4.0,
     critic_summary: "Good lifestyle content with strong engagement hook.",
   },
+  {
+    slot_id: "slot-008",
+    slot_number: 8,
+    caption:
+      "POV: You walk into a coffee shop and the barista already knows your order. That's the lumen experience.",
+    image_prompt:
+      "First-person POV entering a warm coffee shop, barista waving, cinematic vertical video",
+    platform: "tiktok" as Platform,
+    scheduled_for: "2026-04-30T18:00:00Z",
+    image_url: null,
+    status: "pending",
+    critic_scores: [
+      { axis: "Brand Voice Alignment", score: 4.0, reasoning: "Casual, relatable — fits TikTok voice" },
+      { axis: "Visual Coherence", score: 3.8, reasoning: "POV format is on-trend" },
+      { axis: "Platform Fit", score: 4.5, reasoning: "Perfect TikTok format" },
+      { axis: "Audience Relevance", score: 4.2, reasoning: "Younger audience cross-sell" },
+      { axis: "Originality", score: 3.9, reasoning: "POV trend is popular but well-executed" },
+    ],
+    critic_average: 4.08,
+    critic_summary: "Strong TikTok-native content with good engagement potential.",
+  },
+  {
+    slot_id: "slot-009",
+    slot_number: 9,
+    caption:
+      "Monday motivation: Your coffee order says a lot about you. What's yours?",
+    image_prompt: "Coffee cups lineup flat lay with personality labels",
+    platform: "instagram" as Platform,
+    scheduled_for: "2026-04-28T16:00:00Z",
+    image_url: null,
+    status: "published",
+    critic_scores: [
+      { axis: "Brand Voice Alignment", score: 4.1, reasoning: "Engaging and on-brand" },
+      { axis: "Visual Coherence", score: 4.0, reasoning: "Flat lay is Instagram-classic" },
+      { axis: "Platform Fit", score: 4.3, reasoning: "Poll-style IG content" },
+      { axis: "Audience Relevance", score: 4.0, reasoning: "Broad appeal" },
+      { axis: "Originality", score: 3.5, reasoning: "Common format but well-done" },
+    ],
+    critic_average: 3.98,
+    critic_summary: "Solid engagement bait with good brand alignment.",
+    engagement: {
+      likes: 342,
+      shares: 28,
+      comments: 67,
+      reach: 4200,
+      engagement_rate: 10.4,
+    },
+  },
 ];
 
 const MOCK_MESSAGES: AgentEnvelope[] = [
@@ -232,7 +281,113 @@ const MOCK_MESSAGES: AgentEnvelope[] = [
   },
 ];
 
+// ─── Calendar helpers ────────────────────────────────────────
+
+function _mockMondayOf(date: Date): string {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+function _filterSlotsByWeek(
+  slots: ContentSlot[],
+  weekStart: string,
+): ContentSlot[] {
+  const start = new Date(weekStart + "T00:00:00Z");
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+  return slots.filter((s) => {
+    const d = new Date(s.scheduled_for);
+    return d >= start && d < end;
+  });
+}
+
 // ─── API Functions ───────────────────────────────────────────
+
+export async function fetchCalendar(
+  brandId: string,
+  weekStart?: string,
+  token?: string,
+): Promise<CalendarResponse> {
+  const ws = weekStart ?? _mockMondayOf(new Date());
+  if (USE_MOCK) {
+    return {
+      brand_id: MOCK_BRAND.brand_id,
+      week_start: ws,
+      posts: _filterSlotsByWeek(MOCK_SLOTS, ws),
+    };
+  }
+  const url = `${GATEWAY_URL}/brands/${brandId}/calendar?week_start=${ws}`;
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) return { brand_id: brandId, week_start: ws, posts: [] };
+  return res.json();
+}
+
+export async function approveSlot(
+  slotId: string,
+  token?: string,
+): Promise<void> {
+  if (USE_MOCK) return;
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/approve`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    console.error(`Failed to approve slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to approve slot: ${res.statusText}`);
+  }
+}
+
+export async function skipSlot(
+  slotId: string,
+  token?: string,
+): Promise<void> {
+  if (USE_MOCK) return;
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/skip`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    console.error(`Failed to skip slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to skip slot: ${res.statusText}`);
+  }
+}
+
+export async function regenerateSlot(
+  slotId: string,
+  token?: string,
+): Promise<void> {
+  if (USE_MOCK) return;
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/regenerate`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    console.error(`Failed to regenerate slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to regenerate slot: ${res.statusText}`);
+  }
+}
+
+export async function addManualPost(
+  post: {
+    platform: string;
+    scheduled_for: string;
+    content_text: string;
+  },
+  token?: string,
+): Promise<ContentSlot | null> {
+  if (USE_MOCK) return null;
+  const res = await fetch(`${GATEWAY_URL}/api/slots/manual`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(post),
+  });
+  if (!res.ok) {
+    console.error(`Failed to add manual post: ${res.status}`);
+    throw new Error(`Failed to add manual post: ${res.statusText}`);
+  }
+  return res.json();
+}
 
 export async function fetchBrand(token?: string): Promise<BrandKit | null> {
   if (USE_MOCK) return MOCK_BRAND;
