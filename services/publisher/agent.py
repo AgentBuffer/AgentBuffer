@@ -146,7 +146,8 @@ def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishRes
             media_url = slot.image_url
             if not media_url.startswith("http"):
                 media_url = _upload_to_storage(media_url)
-            payload["mediaUrls"] = [media_url]
+            if media_url.startswith("http"):
+                payload["mediaUrls"] = [media_url]
 
         resp = requests.post(
             "https://app.ayrshare.com/api/post",
