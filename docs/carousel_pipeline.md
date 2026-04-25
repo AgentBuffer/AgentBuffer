@@ -17,7 +17,8 @@ The Carousel Creator agent extends the existing `Strategist → Critic → Publi
    └───────────┘            └──────────┘         │   ┌──────────────┐
                                                  └──▶│  PUBLISHER   │
                                                      │ (posts via   │
-                                                     │  Ayrshare)   │
+                                                     │  Platform    │
+                                                     │  APIs)       │
                                                      └──────┬───────┘
                                                             ▼
                                                   LinkedIn · Instagram
@@ -71,7 +72,7 @@ For each `SlideContent`:
 
 ### 5. Handoff to Publisher
 
-The Carousel Creator wraps all `CarouselResult`s in an `AgentEnvelope` and sends to the Publisher, which uploads to each platform via Ayrshare.
+The Carousel Creator wraps all `CarouselResult`s in an `AgentEnvelope` and sends to the Publisher, which uploads to each platform via direct platform APIs.
 
 ## New Pydantic Models (added to `services/shared/models.py`)
 

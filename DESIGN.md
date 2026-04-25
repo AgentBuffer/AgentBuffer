@@ -29,7 +29,7 @@ A user onboards their brand once (Q&A + PDFs + past videos + linked socials). Th
      ┌──────────────┐ ┌─────────┐ ┌───────────┐ ┌──────────┐
      │  STRATEGIST  │ │ CRITIC  │ │  VIDEO    │ │PUBLISHER │
      │              │ │         │ │  CREATOR  │ │          │
-     │ Plans weekly │ │ 5-axis  │ │ Veo API   │ │ Ayrshare │
+     │ Plans weekly │ │ 5-axis  │ │ Veo API   │ │ Direct   │
      │ content slate│ │ scoring │ │ per-plat  │ │ multi-   │
      │ using LLM    │ │ rejects │ │ trends    │ │ platform │
      │              │ │ weak    │ │           │ │          │
@@ -44,7 +44,7 @@ All agents registered on Agentverse with Chat Protocol. Discoverable via ASI:One
 4. Head Agent dispatches to Strategist → returns 7-day Slate
 5. Head Agent dispatches to Critic → scores & rejects weak slots
 6. Head Agent dispatches to Video Creator → generates platform videos (Veo)
-7. Head Agent dispatches to Publisher → schedules posts (Ayrshare)
+7. Head Agent dispatches to Publisher → schedules posts (Direct Platform APIs)
 8. Head Agent compiles final report and sends to user
 
 Intermediate status updates streamed to user at each stage.

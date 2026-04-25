@@ -328,10 +328,14 @@ export async function approveSlot(
   token?: string,
 ): Promise<void> {
   if (USE_MOCK) return;
-  await fetch(`${GATEWAY_URL}/api/slots/${slotId}/approve`, {
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/approve`, {
     method: "POST",
     headers: authHeaders(token),
   });
+  if (!res.ok) {
+    console.error(`Failed to approve slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to approve slot: ${res.statusText}`);
+  }
 }
 
 export async function skipSlot(
@@ -339,10 +343,14 @@ export async function skipSlot(
   token?: string,
 ): Promise<void> {
   if (USE_MOCK) return;
-  await fetch(`${GATEWAY_URL}/api/slots/${slotId}/skip`, {
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/skip`, {
     method: "POST",
     headers: authHeaders(token),
   });
+  if (!res.ok) {
+    console.error(`Failed to skip slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to skip slot: ${res.statusText}`);
+  }
 }
 
 export async function regenerateSlot(
@@ -350,10 +358,14 @@ export async function regenerateSlot(
   token?: string,
 ): Promise<void> {
   if (USE_MOCK) return;
-  await fetch(`${GATEWAY_URL}/api/slots/${slotId}/regenerate`, {
+  const res = await fetch(`${GATEWAY_URL}/api/slots/${slotId}/regenerate`, {
     method: "POST",
     headers: authHeaders(token),
   });
+  if (!res.ok) {
+    console.error(`Failed to regenerate slot ${slotId}: ${res.status}`);
+    throw new Error(`Failed to regenerate slot: ${res.statusText}`);
+  }
 }
 
 export async function addManualPost(
@@ -370,7 +382,10 @@ export async function addManualPost(
     headers: authHeaders(token),
     body: JSON.stringify(post),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`Failed to add manual post: ${res.status}`);
+    throw new Error(`Failed to add manual post: ${res.statusText}`);
+  }
   return res.json();
 }
 

@@ -17,7 +17,8 @@ The Video Creator agent extends the existing `Strategist → Critic → Publishe
    └───────────┘            └──────────┘         │   ┌──────────────┐
                                                  └──▶│  PUBLISHER   │
                                                      │ (posts via   │
-                                                     │  Ayrshare)   │
+                                                     │  Platform    │
+                                                     │  APIs)       │
                                                      └──────┬───────┘
                                                             ▼
                                               YouTube · TikTok · Instagram
@@ -63,7 +64,7 @@ For each `VideoRequest`:
 
 ### 5. Handoff to Publisher
 
-The Video Creator wraps all `VideoResult`s in an `AgentEnvelope` and sends to the Publisher, which uploads to each platform via Ayrshare.
+The Video Creator wraps all `VideoResult`s in an `AgentEnvelope` and sends to the Publisher, which uploads to each platform via direct platform APIs.
 
 ## New Pydantic Models (added to `services/shared/models.py`)
 

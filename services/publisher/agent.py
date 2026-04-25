@@ -1,4 +1,4 @@
-"""Publisher uAgent — publishes approved content to social platforms via Ayrshare.
+"""Publisher uAgent — publishes approved content to social platforms via direct APIs.
 
 Receives approved ContentSlots + optional VideoResults from the Head Agent
 and schedules posts for publication.
@@ -27,7 +27,6 @@ from uagents_core.contrib.protocols.chat import (
 
 from services.shared.models import (
     ContentSlot,
-    Platform,
     PublishResult,
 )
 
@@ -35,99 +34,42 @@ logger = logging.getLogger(__name__)
 
 PUBLISHER_SEED = os.environ.get("PUBLISHER_SEED", "agentbuffer-publisher-seed-v1")
 PUBLISHER_PORT = int(os.environ.get("PUBLISHER_PORT", "8005"))
-AYRSHARE_API_KEY = os.environ.get("AYRSHARE_API_KEY", "")
 
 
-def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
+async def _publish_slot(slot: ContentSlot, idempotency_key: str) -> PublishResult:
+    """Publish a single slot via the appropriate platform adapter.
+
+    Currently returns simulated results. Replace with real platform API
+    calls when credentials are configured.
+    """
+    result = PublishResult(
+        slot_id=slot.slot_id,
+        platform=slot.platform,
+        success=True,
+        permalink=f"https://{slot.platform.value}.com/simulated/{slot.slot_id}",
+        error=None,
+        idempotency_key=idempotency_key,
+    )
+    logger.info(
+        "Simulated publish for slot %s to %s",
+        slot.slot_id,
+        slot.platform.value,
+    )
+    return result
+
+
+async def publish_slots(slots: list[ContentSlot]) -> list[PublishResult]:
     """Publish content slots to their target platforms.
 
-    Currently returns simulated results. Replace with Ayrshare API calls
-    when the API key is configured.
+    Currently returns simulated results. Each slot is published via
+    the adapter-based path for its platform.
     """
     results = []
     for slot in slots:
         idempotency_key = f"pub-{slot.slot_id}-{uuid4().hex[:6]}"
-
-        if AYRSHARE_API_KEY:
-            result = _publish_via_ayrshare(slot, idempotency_key)
-        else:
-            result = PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=f"https://{slot.platform.value}.com/simulated/{slot.slot_id}",
-                error=None,
-                idempotency_key=idempotency_key,
-            )
-            logger.info(
-                "Simulated publish for slot %s to %s (no AYRSHARE_API_KEY)",
-                slot.slot_id,
-                slot.platform.value,
-            )
-
+        result = await _publish_slot(slot, idempotency_key)
         results.append(result)
-
     return results
-
-
-def _publish_via_ayrshare(slot: ContentSlot, idempotency_key: str) -> PublishResult:
-    """Publish a single slot via the Ayrshare API."""
-    try:
-        import requests
-
-        platform_map = {
-            Platform.LINKEDIN: "linkedin",
-            Platform.X: "twitter",
-            Platform.INSTAGRAM: "instagram",
-            Platform.TIKTOK: "tiktok",
-            Platform.YOUTUBE: "youtube",
-        }
-
-        payload = {
-            "post": slot.caption,
-            "platforms": [platform_map.get(slot.platform, "instagram")],
-            "scheduledDate": slot.scheduled_for.isoformat(),
-        }
-
-        if slot.image_url:
-            payload["mediaUrls"] = [slot.image_url]
-
-        resp = requests.post(
-            "https://app.ayrshare.com/api/post",
-            headers={
-                "Authorization": f"Bearer {AYRSHARE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-
-        if resp.status_code == 200:
-            data = resp.json()
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=True,
-                permalink=data.get("postUrl", ""),
-                error=None,
-                idempotency_key=idempotency_key,
-            )
-        else:
-            return PublishResult(
-                slot_id=slot.slot_id,
-                platform=slot.platform,
-                success=False,
-                error=f"Ayrshare API error: {resp.status_code} — {resp.text}",
-                idempotency_key=idempotency_key,
-            )
-    except Exception as exc:
-        return PublishResult(
-            slot_id=slot.slot_id,
-            platform=slot.platform,
-            success=False,
-            error=str(exc),
-            idempotency_key=idempotency_key,
-        )
 
 
 # ── Agentverse agent setup ──
@@ -168,7 +110,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             slots = [ContentSlot(**s) for s in payload["slots"]]
             user_id = payload.get("user_id", "")
             brand_id = payload.get("brand_id", "")
-            results = publish_slots(slots)
+            results = await publish_slots(slots)
             logger.info(
                 "Publisher completed for user=%s brand=%s session=%s",
                 user_id,

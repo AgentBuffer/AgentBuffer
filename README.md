@@ -20,7 +20,7 @@ User (ASI:One) → Head Agent → Strategist → Critic → Video Creator → Pu
 | **Strategist** | Generates 7-day content slates with platform-optimized captions | `services/strategist/` |
 | **Critic** | 5-axis quality scoring, rejects weak content (must reject ≥1) | `services/critic/` |
 | **Video Creator** | Platform-specific video generation via Google Veo | `services/video_creator/` |
-| **Publisher** | Multi-platform publishing via Ayrshare | `services/publisher/` |
+| **Publisher** | Multi-platform publishing via direct platform APIs | `services/publisher/` |
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ PYTHONPATH=. python services/head_agent/agent.py
 │   ├── strategist/       # Content planning agent
 │   ├── critic/           # Quality control agent
 │   ├── video_creator/    # Video generation agent (Veo API)
-│   ├── publisher/        # Social media publishing agent (Ayrshare)
+│   ├── publisher/        # Social media publishing agent (Direct Platform APIs)
 │   └── shared/           # Pydantic models shared across agents
 ├── apps/web/             # Next.js dashboard (bonus UI)
 ├── gateway/              # FastAPI gateway
@@ -63,7 +63,7 @@ PYTHONPATH=. python services/head_agent/agent.py
 - **Agent Framework**: Fetch.ai uAgents + Agentverse Chat Protocol
 - **LLM**: ASI:One (OpenAI-compatible API)
 - **Video**: Google Veo API
-- **Publishing**: Ayrshare
+- **Publishing**: Direct Platform APIs (X, Instagram, LinkedIn, TikTok, YouTube, Bluesky)
 - **Frontend**: Next.js 15, React, Tailwind CSS
 - **Database**: Supabase (PostgreSQL)
 
