@@ -106,6 +106,24 @@ class AgentEnvelope(BaseModel):
     timestamp: datetime
 
 
+class PerformanceRecord(BaseModel):
+    post_id: str
+    platform: Platform
+    published_at: datetime
+    content_type: str
+    likes: int = 0
+    shares: int = 0
+    comments: int = 0
+    reach: int = 0
+    engagement_rate: float = 0.0
+
+
+class BrandPerformanceSummary(BaseModel):
+    brand_id: str
+    top_formats: list[dict]
+    best_times: dict
+    avoid_patterns: list[str]
+
 
 class TrendContext(BaseModel):
     platform: Platform
