@@ -6,10 +6,7 @@ import sys
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from services.shared.models import ContentSlot, Platform, PublishResult
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -106,7 +106,6 @@ class AgentEnvelope(BaseModel):
     timestamp: datetime
 
 
-
 class TrendContext(BaseModel):
     platform: Platform
     trending_topics: list[str]

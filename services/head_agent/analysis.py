@@ -34,7 +34,8 @@ Respond ONLY with the JSON object, no markdown fences or extra text.\
 """
 
 BRAND_EXTRACTION_PROMPT = """\
-You are a brand intake assistant. Given a user's free-form business description, extract structured \
+You are a brand intake assistant. Given a user's free-form business description, \
+extract structured \
 brand information. Respond with valid JSON matching this schema:
 
 {

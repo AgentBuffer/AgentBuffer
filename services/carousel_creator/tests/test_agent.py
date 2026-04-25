@@ -5,11 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
 from PIL import Image
 
 from services.carousel_creator.agent import (
-    CAROUSEL_PLATFORMS,
     process_approved_slate,
     wrap_results_as_envelope,
 )
@@ -23,7 +21,6 @@ from services.shared.models import (
     Platform,
     Slate,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -103,19 +100,23 @@ class TestCarouselProcessApprovedSlate:
             assert img.size == (1080, 1350)
 
     def test_skips_unapproved_slots(self, tmp_path: Path):
-        slate = _approved_slate([
-            ("slot-ok", Platform.INSTAGRAM, True),
-            ("slot-no", Platform.INSTAGRAM, False),
-        ])
+        slate = _approved_slate(
+            [
+                ("slot-ok", Platform.INSTAGRAM, True),
+                ("slot-no", Platform.INSTAGRAM, False),
+            ]
+        )
         results = process_approved_slate(slate, _brand(), output_root=tmp_path)
         assert len(results) == 1
         assert results[0].slot_id == "slot-ok"
 
     def test_skips_non_carousel_platforms(self, tmp_path: Path):
-        slate = _approved_slate([
-            ("slot-tt", Platform.TIKTOK, True),
-            ("slot-yt", Platform.YOUTUBE, True),
-        ])
+        slate = _approved_slate(
+            [
+                ("slot-tt", Platform.TIKTOK, True),
+                ("slot-yt", Platform.YOUTUBE, True),
+            ]
+        )
         results = process_approved_slate(slate, _brand(), output_root=tmp_path)
         assert results == []
 

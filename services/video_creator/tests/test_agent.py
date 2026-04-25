@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -18,7 +18,6 @@ from services.shared.models import (
     VideoResult,
 )
 from services.video_creator.agent import process_approved_slate, wrap_results_as_envelope
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,18 +98,22 @@ def _mock_veo_client(results: dict[str, VideoResult]) -> MagicMock:
 class TestProcessApprovedSlate:
     @pytest.mark.asyncio
     async def test_only_approved_slots_processed(self, brand: BrandKit):
-        slate = _make_approved_slate([
-            ("slot-a", Platform.TIKTOK, True),
-            ("slot-b", Platform.YOUTUBE, False),
-        ])
-        veo = _mock_veo_client({
-            "slot-a": VideoResult(
-                slot_id="slot-a",
-                platform=Platform.TIKTOK,
-                status="success",
-                video_url="gs://bucket/a.mp4",
-            ),
-        })
+        slate = _make_approved_slate(
+            [
+                ("slot-a", Platform.TIKTOK, True),
+                ("slot-b", Platform.YOUTUBE, False),
+            ]
+        )
+        veo = _mock_veo_client(
+            {
+                "slot-a": VideoResult(
+                    slot_id="slot-a",
+                    platform=Platform.TIKTOK,
+                    status="success",
+                    video_url="gs://bucket/a.mp4",
+                ),
+            }
+        )
 
         results = await process_approved_slate(slate, brand, veo_client=veo)
         assert len(results) == 1

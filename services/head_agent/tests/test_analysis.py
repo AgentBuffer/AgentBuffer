@@ -14,7 +14,6 @@ from services.head_agent.analysis import (
 )
 from services.shared.models import BrandKit, MarketingAnalysis
 
-
 # ---------------------------------------------------------------------------
 # _clean_json_response
 # ---------------------------------------------------------------------------
@@ -22,11 +21,11 @@ from services.shared.models import BrandKit, MarketingAnalysis
 
 class TestCleanJsonResponse:
     def test_strips_markdown_fences(self):
-        raw = "```json\n{\"key\": \"value\"}\n```"
+        raw = '```json\n{"key": "value"}\n```'
         assert _clean_json_response(raw) == '{"key": "value"}'
 
     def test_strips_whitespace(self):
-        assert _clean_json_response("  {\"a\": 1}  ") == '{"a": 1}'
+        assert _clean_json_response('  {"a": 1}  ') == '{"a": 1}'
 
     def test_handles_no_fences(self):
         raw = '{"a": 1}'
@@ -53,18 +52,20 @@ def _mock_chat_response(content: str) -> MagicMock:
     return resp
 
 
-_BRAND_JSON = json.dumps({
-    "brand_id": "brand-new",
-    "org_id": "org-new",
-    "name": "TestBrand",
-    "tagline": "Test tagline",
-    "voice_description": "Friendly",
-    "target_audience": "Developers",
-    "color_palette": ["#FF0000"],
-    "logo_url": None,
-    "sample_captions": ["Hello"],
-    "industry": "Tech",
-})
+_BRAND_JSON = json.dumps(
+    {
+        "brand_id": "brand-new",
+        "org_id": "org-new",
+        "name": "TestBrand",
+        "tagline": "Test tagline",
+        "voice_description": "Friendly",
+        "target_audience": "Developers",
+        "color_palette": ["#FF0000"],
+        "logo_url": None,
+        "sample_captions": ["Hello"],
+        "industry": "Tech",
+    }
+)
 
 
 class TestExtractBrandKit:
@@ -103,17 +104,19 @@ class TestExtractBrandKit:
 # ---------------------------------------------------------------------------
 
 
-_ANALYSIS_JSON = json.dumps({
-    "brand_name": "TestBrand",
-    "industry": "Tech",
-    "competitive_positioning": "Market leader",
-    "key_differentiators": ["speed", "reliability"],
-    "target_audience_insights": "Tech-savvy devs",
-    "recommended_platforms": ["linkedin", "x"],
-    "content_themes": ["innovation", "community"],
-    "tone_guidelines": "Professional yet friendly",
-    "weekly_cadence": "5 posts/week",
-})
+_ANALYSIS_JSON = json.dumps(
+    {
+        "brand_name": "TestBrand",
+        "industry": "Tech",
+        "competitive_positioning": "Market leader",
+        "key_differentiators": ["speed", "reliability"],
+        "target_audience_insights": "Tech-savvy devs",
+        "recommended_platforms": ["linkedin", "x"],
+        "content_themes": ["innovation", "community"],
+        "tone_guidelines": "Professional yet friendly",
+        "weekly_cadence": "5 posts/week",
+    }
+)
 
 
 class TestGenerateMarketingAnalysis:

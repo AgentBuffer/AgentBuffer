@@ -11,26 +11,19 @@ from services.shared.models import (
     AgentEnvelope,
     ApprovedSlate,
     BrandKit,
-    CarouselResult,
     ContentSlot,
     CriticScore,
     CriticVerdict,
-    DesignPlan,
     DesignRequest,
     DesignTaskType,
     MarketingAnalysis,
-    Platform,
     PlanStep,
-    PublishResult,
-    RejectionNotice,
-    SlideContent,
+    Platform,
     Slate,
     SpecialistResult,
-    TrendContext,
     VideoRequest,
     VideoResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

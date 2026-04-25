@@ -125,11 +125,15 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             text += item.text
 
     if not text.strip():
-        await _send_final(ctx, sender, "Please describe your business and product so I can create a marketing plan.")
+        await _send_final(
+            ctx,
+            sender,
+            "Please describe your business and product so I can create a marketing plan.",
+        )
         return
 
-    # Check if this is a sub-agent reply (Strategist or Critic)
-    # Sub-agents prefix their replies with [STRATEGIST_REPLY:session_id] or [CRITIC_REPLY:session_id]
+    # Check if this is a sub-agent reply (Strategist or Critic).
+    # Sub-agents prefix replies with [STRATEGIST_REPLY:…] or [CRITIC_REPLY:…].
     if text.startswith("[STRATEGIST_REPLY:"):
         await _handle_strategist_reply(ctx, sender, text)
         return
@@ -144,13 +148,21 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     ctx.storage.set(f"sender_session:{sender}", session_id)
 
     # Stage 1: Brand extraction
-    await _send_status(ctx, sender, "Analyzing your business... extracting brand identity and positioning.")
+    await _send_status(
+        ctx, sender, "Analyzing your business... extracting brand identity and positioning."
+    )
 
     try:
         brand = extract_brand_kit(text)
     except Exception as exc:
         logger.error("Brand extraction failed: %s", exc)
-        await _send_final(ctx, sender, f"I had trouble understanding your business description. Could you provide more detail about your brand name, industry, target audience, and brand voice?\n\nError: {exc}")
+        await _send_final(
+            ctx,
+            sender,
+            "I had trouble understanding your business description."
+            " Could you provide more detail about your brand name,"
+            f" industry, target audience, and brand voice?\n\nError: {exc}",
+        )
         return
 
     _store(ctx, session_id, "brand", brand.json())
@@ -162,7 +174,8 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         sender,
         f"Brand identified: **{brand.name}** in {brand.industry}.\n"
         f"Target audience: {brand.target_audience}\n\n"
-        "Now generating your marketing analysis — competitive positioning, content themes, platform strategy...",
+        "Now generating your marketing analysis — competitive positioning,"
+        " content themes, platform strategy...",
     )
 
     try:
@@ -192,11 +205,13 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     await _send_status(ctx, sender, analysis_summary)
 
     # Stage 3: Dispatch to Strategist
-    strategist_payload = json.dumps({
-        "session_id": session_id,
-        "brand": json.loads(brand.json()),
-        "analysis": json.loads(analysis.json()),
-    })
+    strategist_payload = json.dumps(
+        {
+            "session_id": session_id,
+            "brand": json.loads(brand.json()),
+            "analysis": json.loads(analysis.json()),
+        }
+    )
 
     if not STRATEGIST_ADDRESS:
         # If no strategist address, run strategist inline (for local testing)
@@ -208,7 +223,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[STRATEGIST_REQUEST:{session_id}]\n{strategist_payload}")],
+            content=[
+                TextContent(
+                    type="text", text=f"[STRATEGIST_REQUEST:{session_id}]\n{strategist_payload}"
+                )
+            ],
         ),
     )
 
@@ -230,8 +249,7 @@ async def _run_strategist_inline(ctx, session_id, sender, brand, analysis):
     _store(ctx, session_id, "stage", "critique")
 
     slot_summary = "\n".join(
-        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..."
-        for s in slate.slots
+        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..." for s in slate.slots
     )
     await _send_status(
         ctx,
@@ -246,17 +264,21 @@ async def _run_strategist_inline(ctx, session_id, sender, brand, analysis):
         await _run_critic_inline(ctx, session_id, sender, slate)
         return
 
-    critic_payload = json.dumps({
-        "session_id": session_id,
-        "slate": json.loads(slate.json()),
-        "brand": json.loads(brand.json()),
-    })
+    critic_payload = json.dumps(
+        {
+            "session_id": session_id,
+            "slate": json.loads(slate.json()),
+            "brand": json.loads(brand.json()),
+        }
+    )
     await ctx.send(
         CRITIC_ADDRESS,
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")],
+            content=[
+                TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")
+            ],
         ),
     )
 
@@ -267,6 +289,7 @@ async def _run_critic_inline(ctx, session_id, sender, slate):
 
     brand_json = _load(ctx, session_id, "brand")
     from services.shared.models import BrandKit
+
     brand = BrandKit.parse_raw(brand_json)
 
     await _send_status(ctx, sender, "Critic is reviewing each content piece on 5 quality axes...")
@@ -302,8 +325,8 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     """Handle the Strategist sub-agent's reply with the generated Slate."""
     # Parse session_id from prefix
     prefix_end = text.index("]")
-    session_id = text[len("[STRATEGIST_REPLY:"):prefix_end]
-    payload_text = text[prefix_end + 1:].strip()
+    session_id = text[len("[STRATEGIST_REPLY:") : prefix_end]
+    payload_text = text[prefix_end + 1 :].strip()
 
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
@@ -313,6 +336,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     try:
         slate_data = json.loads(payload_text)
         from services.shared.models import Slate
+
         slate = Slate(**slate_data)
     except Exception as exc:
         logger.error("Failed to parse strategist reply: %s", exc)
@@ -323,8 +347,7 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
     _store(ctx, session_id, "stage", "critique")
 
     slot_summary = "\n".join(
-        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..."
-        for s in slate.slots
+        f"  {s.slot_number}. [{s.platform.value.upper()}] {s.caption[:80]}..." for s in slate.slots
     )
     await _send_status(
         ctx,
@@ -336,11 +359,13 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
 
     # Dispatch to Critic
     brand_json = _load(ctx, session_id, "brand")
-    critic_payload = json.dumps({
-        "session_id": session_id,
-        "slate": json.loads(slate.json()),
-        "brand": json.loads(brand_json) if brand_json else {},
-    })
+    critic_payload = json.dumps(
+        {
+            "session_id": session_id,
+            "slate": json.loads(slate.json()),
+            "brand": json.loads(brand_json) if brand_json else {},
+        }
+    )
 
     if not CRITIC_ADDRESS:
         await _run_critic_inline(ctx, session_id, user_sender, slate)
@@ -351,7 +376,9 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
         ChatMessage(
             timestamp=datetime.now(tz=timezone.utc),
             msg_id=uuid4(),
-            content=[TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")],
+            content=[
+                TextContent(type="text", text=f"[CRITIC_REQUEST:{session_id}]\n{critic_payload}")
+            ],
         ),
     )
 
@@ -359,8 +386,8 @@ async def _handle_strategist_reply(ctx: Context, sender: str, text: str) -> None
 async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
     """Handle the Critic sub-agent's reply with verdicts."""
     prefix_end = text.index("]")
-    session_id = text[len("[CRITIC_REPLY:"):prefix_end]
-    payload_text = text[prefix_end + 1:].strip()
+    session_id = text[len("[CRITIC_REPLY:") : prefix_end]
+    payload_text = text[prefix_end + 1 :].strip()
 
     user_sender = _load(ctx, session_id, "sender")
     if not user_sender:
@@ -370,6 +397,7 @@ async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
     try:
         verdicts_data = json.loads(payload_text)
         from services.shared.models import CriticVerdict
+
         verdicts = [CriticVerdict(**v) for v in verdicts_data]
     except Exception as exc:
         logger.error("Failed to parse critic reply: %s", exc)
@@ -396,14 +424,14 @@ async def _handle_critic_reply(ctx: Context, sender: str, text: str) -> None:
 
 async def _compile_final_report(ctx: Context, session_id: str, recipient: str) -> None:
     """Compile all pipeline results into a final report and send to user."""
-    from services.shared.models import BrandKit, MarketingAnalysis, Slate, CriticVerdict
+    from services.shared.models import BrandKit, CriticVerdict, MarketingAnalysis, Slate
 
     brand_json = _load(ctx, session_id, "brand")
     analysis_json = _load(ctx, session_id, "analysis")
     slate_json = _load(ctx, session_id, "slate")
     verdicts_json = _load(ctx, session_id, "verdicts")
 
-    brand = BrandKit.parse_raw(brand_json) if brand_json else None
+    _brand = BrandKit.parse_raw(brand_json) if brand_json else None  # noqa: F841
     analysis = MarketingAnalysis.parse_raw(analysis_json) if analysis_json else None
     slate = Slate.parse_raw(slate_json) if slate_json else None
     verdicts = [CriticVerdict(**v) for v in json.loads(verdicts_json)] if verdicts_json else []
@@ -441,8 +469,7 @@ async def _compile_final_report(ctx: Context, session_id: str, recipient: str) -
             )
         report_parts.append(
             f"\nWEEKLY CONTENT PLAN — {len(slate.slots)} slots\n"
-            f"{'=' * 50}\n"
-            + "\n\n".join(slot_lines)
+            f"{'=' * 50}\n" + "\n\n".join(slot_lines)
         )
 
     # Critic Summary
@@ -456,7 +483,8 @@ async def _compile_final_report(ctx: Context, session_id: str, recipient: str) -
 
     report_parts.append(
         "\n\nThis marketing plan was generated by AgentBuffer's multi-agent system:\n"
-        "  Head Agent (orchestration) -> Strategist (content planning) -> Critic (quality control)\n"
+        "  Head Agent (orchestration) -> Strategist (content planning)"
+        " -> Critic (quality control)\n"
         "All agents are registered on Fetch.ai Agentverse and communicate via the Chat Protocol."
     )
 
