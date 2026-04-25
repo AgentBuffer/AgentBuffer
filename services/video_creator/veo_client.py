@@ -36,6 +36,7 @@ class VeoClient:
         Returns a VideoResult with status "success", "error", or "timeout".
         Never raises — all failures are captured in the result.
         """
+        result: VideoResult | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             result = await self._attempt_generate(request, attempt)
             if result.status == "success" or result.status == "timeout":
@@ -49,7 +50,14 @@ class VeoClient:
                     result.error,
                 )
                 await asyncio.sleep(POLL_INITIAL_DELAY_SEC * attempt)
-        return result  # type: ignore[possibly-undefined]
+        if result is None:
+            return VideoResult(
+                slot_id=request.slot_id,
+                platform=request.platform,
+                status="error",
+                error="MAX_RETRIES is 0 — no attempts were made",
+            )
+        return result
 
     async def _attempt_generate(
         self,
