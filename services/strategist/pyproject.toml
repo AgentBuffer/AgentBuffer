@@ -1,0 +1,12 @@
+[project]
+name = "agentbuffer-strategist"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "uagents>=0.14",
+    "anthropic>=0.40",
+    "agentbuffer-shared",
+]
+
+[tool.uv.sources]
+agentbuffer-shared = { workspace = true }

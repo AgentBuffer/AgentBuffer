@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Next.js
+.next/
+out/
+
+# Vercel
+.vercel/
+
+# Supabase
+.supabase/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+
+# Misc
+*.log
