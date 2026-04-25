@@ -12,6 +12,8 @@ class Platform(str, Enum):
     LINKEDIN = "linkedin"
     X = "x"
     INSTAGRAM = "instagram"
+    TIKTOK = "tiktok"
+    YOUTUBE = "youtube"
 
 
 class BrandKit(BaseModel):
@@ -85,3 +87,31 @@ class AgentEnvelope(BaseModel):
     payload: dict
     signature: str
     timestamp: datetime
+
+
+class TrendContext(BaseModel):
+    platform: Platform
+    trending_topics: list[str]
+    style_hints: list[str]
+    hook_type: str
+    trending_audio_cues: list[str]
+
+
+class VideoRequest(BaseModel):
+    slot_id: str
+    prompt: str
+    aspect_ratio: str
+    platform: Platform
+    audio_cue: str | None = None
+    brand_context: str
+    duration_seconds: int = 8
+
+
+class VideoResult(BaseModel):
+    slot_id: str
+    video_url: str | None = None
+    local_path: str | None = None
+    platform: Platform
+    duration_seconds: int | None = None
+    status: str
+    error: str | None = None

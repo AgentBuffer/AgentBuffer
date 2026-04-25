@@ -1,0 +1,18 @@
+[project]
+name = "agentbuffer-video-creator"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "google-genai>=1.0",
+    "pydantic>=2.0",
+    "agentbuffer-shared",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.uv.sources]
+agentbuffer-shared = { workspace = true }
